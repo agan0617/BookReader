@@ -527,6 +527,7 @@ K書吧會自動找章節，不用自己設定：
 - 可以調**速度**、**音量**、換**語音**，這些設定每台裝置各自記住，下次打開還在。iPhone／iPad 的 Safari 不理會網頁設的朗讀音量，要用手機的音量鍵調。用的是瀏覽器或系統內建的語音，Windows 上建議選名稱有「Chinese (Traditional, Taiwan)」的那個。
 - **定時停止**：15 到 60 分鐘，或念完這一章就停，適合睡前聽。選過的時間會記住，下次開始朗讀時自動套用。
 - 朗讀時會盡量讓螢幕保持亮著。切到別的 App 或鎖定螢幕時，K書吧 會設法讓朗讀繼續，通知欄和鎖定畫面也有播放、暫停、上一段／下一段的按鈕；不過有些手機的瀏覽器還是會把朗讀停掉，回到 K書吧 就會接著念。
+- **Android 上想關螢幕聽書**：用 K書吧 App。App 裡的朗讀交給手機的語音引擎，切 App、鎖螢幕都會繼續念；語音清單是手機裝的語音。App 的瀏覽器資料跟 Chrome 分開，第一次打開要再貼一次 token。
 
 ---
 
@@ -1086,6 +1087,11 @@ async function openBook(id) {
   const ch = p ? Math.min(Math.max(0, p.ch | 0), R.chapters.length - 1) : 0;
   renderToc();
   openChapter(ch, { block: p && (p.ch | 0) === ch ? (p.b | 0) : 0 });
+  // App 裡：這本書如果還在背景念（例如從通知欄點回來），直接接上播放面板與位置
+  if (NATIVE) {
+    const st = nativeState();
+    if (st.active && st.playing && st.bookId === book.id) { showPlayer(); loadVoices(); window.KBookNativeEvent(Object.assign(st, { type: 'pos' })); }
+  }
 }
 
 function openChapter(i, { block = 0 } = {}) {
@@ -1113,7 +1119,7 @@ function goChapter(i) {
   if (i < 0 || i >= R.chapters.length) return;
   openChapter(i, { block: 0 });
   T.b = 0; T.s = 0; T.chunks = null;
-  if (T.playing) restartSpeech(); else clearSpeaking();
+  if (T.playing) { if (NATIVE) ttsStart(0); else restartSpeech(); } else clearSpeaking();
 }
 function closeReader() {
   if (R.view !== 'reader') return;
@@ -1312,6 +1318,49 @@ function closePanels() { $('#toc').hidden = true; $('#aaSheet').hidden = true; $
 const synth = ('speechSynthesis' in window) ? window.speechSynthesis : null;
 const T = { playing: false, b: 0, s: 0, chunks: null, gen: 0, utter: null, errs: 0, sleepTimer: null, sleepAt: 0, stopAtChEnd: false, wake: null, voices: [], tick: null };
 
+/* 在 Android 的 K書吧 App 裡打開時（有 window.KBookNative），朗讀改由 App 的前景服務念：
+   瀏覽器的 speechSynthesis 在 Android 背景會被停掉，App 的不會。網頁把整本書的段落送過去，
+   App 念到哪一段用 window.KBookNativeEvent 回報，網頁照著換章、標示段落、存進度。 */
+const NATIVE = (window.KBookNative && typeof window.KBookNative.start === 'function') ? window.KBookNative : null;
+const canSpeak = () => !!(synth || NATIVE);
+function chapterBlocks(c) {
+  if (!c.html) { try { c.html = sanitize(c.render()); } catch { c.html = ''; } }
+  const tpl = document.createElement('template'); tpl.innerHTML = c.html;
+  // 跟 openChapter 取 R.blocks 的規則一致，段落編號才對得上
+  return [...tpl.content.querySelectorAll('h1,h2,h3,h4,h5,h6,p,li,pre,blockquote,tr')]
+    .filter(el => !el.querySelector('p,li,pre,tr,h1,h2,h3,h4,h5,h6'))
+    .map(el => el.textContent.replace(/\s+/g, ' ').trim());
+}
+function nativeSleepArg() {
+  if (T.stopAtChEnd) return 'ch';
+  return T.sleepAt ? String(Math.max(1, Math.round((T.sleepAt - Date.now()) / 60000))) : '0';
+}
+function nativeStart(b) {
+  NATIVE.start(JSON.stringify({
+    bookId: R.book.id, bookTitle: R.book.title,
+    chapters: R.chapters.map(c => ({ title: c.title, blocks: chapterBlocks(c) })),
+    ch: R.ch, b: Math.max(0, b), rate: prefs.rate, volume: prefs.volume, voice: prefs.voice || '', sleep: nativeSleepArg()
+  }));
+}
+function nativeState() { try { return JSON.parse(NATIVE.getState()); } catch { return { active: false, playing: false }; } }
+window.KBookNativeEvent = e => {
+  if (!e || !NATIVE) return;
+  if (e.type === 'voices') { loadVoices(); return; }
+  if (e.type === 'error') toast(e.message || '朗讀出錯', 5000);
+  if (!R.book || e.bookId !== R.book.id || R.view !== 'reader') return;
+  T.playing = !!e.playing;
+  if (!T.sleepTimer) { T.sleepAt = e.sleepAt || 0; T.stopAtChEnd = !!e.stopAtChEnd; }
+  if (typeof e.ch === 'number' && R.chapters[e.ch]) {
+    if (e.ch !== R.ch) openChapter(e.ch, { block: e.b });
+    T.b = e.b;
+    if (T.playing) markSpeaking(e.b);
+    schedulePos();
+  }
+  if (e.type === 'end') { clearSpeaking(); toast('全書念完了'); }
+  if (e.type === 'sleep') { T.sleepAt = 0; T.stopAtChEnd = false; $('#sleepSel').value = '0'; toast('時間到，已停止朗讀'); }
+  updatePlayer();
+};
+
 function blockText(i) { const el = R.blocks[i]; return el ? el.textContent.replace(/\s+/g, ' ').trim() : ''; }
 function chunksOf(text) {
   if (!text) return [];
@@ -1332,6 +1381,13 @@ function chunksOf(text) {
   return out;
 }
 function loadVoices() {
+  if (NATIVE) {
+    let list = []; try { list = JSON.parse(NATIVE.getVoices()) || []; } catch {}
+    const sel = $('#voiceSel');
+    sel.innerHTML = '<option value="">手機預設語音</option>' + list.map(v => `<option value="${esc(v.id)}">${esc(v.label)}</option>`).join('');
+    sel.value = list.some(v => v.id === prefs.voice) ? prefs.voice : '';
+    return;
+  }
   if (!synth) return;
   T.voices = synth.getVoices();
   const zhRank = v => /zh[-_]TW|Taiwan/i.test(v.lang + v.name) ? 0 : /zh[-_]HK|Hong Kong/i.test(v.lang + v.name) ? 1 : 2;
@@ -1349,14 +1405,18 @@ function currentVoice() {
     || vs.find(v => /zh[-_]TW/i.test(v.lang))
     || vs.find(v => /^zh/i.test(v.lang)) || null;
 }
-function openPlayer() {
-  if (!synth) { toast('這個瀏覽器不支援朗讀'); return; }
+function showPlayer() {
   $('#player').hidden = false; $('#reader').classList.add('with-player'); document.body.classList.add('player-open');
-  if (!T.voices.length) loadVoices();
+}
+function openPlayer() {
+  if (!canSpeak()) { toast('這個瀏覽器不支援朗讀'); return; }
+  showPlayer();
+  if (NATIVE ? !$('#voiceSel').options.length : !T.voices.length) loadVoices();
   if (!T.sleepAt && !T.stopAtChEnd && prefs.sleep && prefs.sleep !== '0') setSleep(prefs.sleep);
   if (!T.playing) ttsStart(currentBlock());
 }
 function ttsStart(b) {
+  if (NATIVE) { T.b = Math.max(0, b); T.playing = true; nativeStart(b); updatePlayer(); return; }
   T.b = Math.max(0, b); T.s = 0; T.chunks = null; T.playing = true; T.errs = 0;
   acquireWake(); keepAlive(true); restartSpeech(); updatePlayer();
 }
@@ -1415,7 +1475,7 @@ function keepAlive(on) {
   updateMediaSession();
 }
 function updateMediaSession() {
-  if (!('mediaSession' in navigator)) return;
+  if (NATIVE || !('mediaSession' in navigator)) return; // App 裡由原生的 MediaSession 管
   try {
     const ms = navigator.mediaSession;
     if (!R.book) { ms.metadata = null; ms.playbackState = 'none'; return; }
@@ -1424,7 +1484,7 @@ function updateMediaSession() {
   } catch {}
 }
 function wireMediaSession() {
-  if (!('mediaSession' in navigator)) return;
+  if (NATIVE || !('mediaSession' in navigator)) return;
   const set = (a, fn) => { try { navigator.mediaSession.setActionHandler(a, fn); } catch {} };
   set('play', () => { if (!T.playing && R.view === 'reader') ttsToggle(); });
   set('pause', () => { if (T.playing) ttsPause(); });
@@ -1433,13 +1493,24 @@ function wireMediaSession() {
   set('previoustrack', () => ttsJump(-1));
 }
 
-function ttsPause() { T.playing = false; T.gen++; if (synth) synth.cancel(); releaseWake(); keepAlive(false); updatePlayer(); }
+function ttsPause() {
+  if (NATIVE) { T.playing = false; NATIVE.pause(); updatePlayer(); return; }
+  T.playing = false; T.gen++; if (synth) synth.cancel(); releaseWake(); keepAlive(false); updatePlayer();
+}
 function ttsToggle() {
   if (T.playing) { ttsPause(); return; }
+  if (NATIVE) {
+    // App 那邊還停在這本、這一章就接著念；換過章或換過書就從畫面上的段落重新開始
+    const st = nativeState();
+    if (st.active && st.bookId === R.book.id && st.ch === R.ch) { T.playing = true; NATIVE.resume(); updatePlayer(); }
+    else ttsStart(currentBlock());
+    return;
+  }
   T.playing = true; T.errs = 0; acquireWake(); keepAlive(true); restartSpeech(); updatePlayer();
 }
 function ttsStop() {
-  if (!synth) return;
+  if (!canSpeak()) return;
+  if (NATIVE) { setSleep('0'); NATIVE.stop(); T.playing = false; clearSpeaking(); hidePlayer(); updatePlayer(); return; }
   ttsPause(); clearSpeaking(); setSleep('0');
   hidePlayer();
 }
@@ -1448,6 +1519,7 @@ function hidePlayer() {
   $('#player').hidden = true; $('#reader').classList.remove('with-player'); document.body.classList.remove('player-open');
 }
 function ttsJump(delta) {
+  if (NATIVE) { NATIVE.jump(delta); return; }
   T.b = Math.max(0, Math.min(R.blocks.length - 1, T.b + delta)); T.s = 0; T.chunks = null;
   if (T.playing) restartSpeech(); else { markSpeaking(T.b); updatePlayer(); }
 }
@@ -1483,9 +1555,11 @@ function setSleep(v) {
   if (v === 'ch') T.stopAtChEnd = true;
   else if (+v > 0) {
     T.sleepAt = Date.now() + (+v) * 60000;
-    T.sleepTimer = setTimeout(() => { setSleep('0'); ttsPause(); toast('時間到，已停止朗讀'); }, (+v) * 60000);
+    // App 裡由原生服務計時（網頁在背景時計時器靠不住），這裡只顯示倒數
+    if (!NATIVE) T.sleepTimer = setTimeout(() => { setSleep('0'); ttsPause(); toast('時間到，已停止朗讀'); }, (+v) * 60000);
     T.tick = setInterval(updatePlayer, 30000);
   }
+  if (NATIVE) NATIVE.setSleep(String(v));
   updatePlayer();
 }
 async function acquireWake() {
@@ -1501,7 +1575,7 @@ function wire() {
   $('#pTune').innerHTML = I.tune; $('#pClose').innerHTML = I.close;
   $('#sortSel').value = prefs.sort;
   $('#rateSel').value = String(prefs.rate);
-  if (!synth) $('#btnTts').hidden = true;
+  if (!canSpeak()) $('#btnTts').hidden = true;
 
   // 書架
   $('#btnImport').onclick = () => $('#fileInput').click();
@@ -1561,13 +1635,13 @@ function wire() {
   $('#pNext').onclick = () => ttsJump(1);
   $('#pClose').onclick = hidePlayer;
   $('#pTune').onclick = () => { const o = $('#pOpts'); o.hidden = !o.hidden; $('#pTune').setAttribute('aria-expanded', String(!o.hidden)); };
-  $('#rateSel').onchange = e => { prefs.rate = +e.target.value; savePrefs(); if (T.playing) restartSpeech(); };
-  $('#voiceSel').onchange = e => { prefs.voice = e.target.value; savePrefs(); if (T.playing) restartSpeech(); };
+  $('#rateSel').onchange = e => { prefs.rate = +e.target.value; savePrefs(); if (NATIVE) NATIVE.setRate(prefs.rate); else if (T.playing) restartSpeech(); };
+  $('#voiceSel').onchange = e => { prefs.voice = e.target.value; savePrefs(); if (NATIVE) NATIVE.setVoice(prefs.voice); else if (T.playing) restartSpeech(); };
   $('#sleepSel').onchange = e => { prefs.sleep = e.target.value; savePrefs(); setSleep(e.target.value); };
   const showVol = () => { $('#volVal').textContent = Math.round(prefs.volume * 100) + '%'; };
   $('#volRange').value = Math.round(prefs.volume * 100); showVol();
   $('#volRange').addEventListener('input', e => { prefs.volume = +e.target.value / 100; showVol(); });
-  $('#volRange').addEventListener('change', () => { savePrefs(); if (T.playing) restartSpeech(); });
+  $('#volRange').addEventListener('change', () => { savePrefs(); if (NATIVE) NATIVE.setVolume(prefs.volume); else if (T.playing) restartSpeech(); });
   if (synth) { synth.cancel(); loadVoices(); if ('onvoiceschanged' in synth) synth.addEventListener('voiceschanged', loadVoices); }
   wireMediaSession();
 
@@ -1596,7 +1670,8 @@ function wire() {
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'hidden') { savePos(); flushCloud(true); }
     else {
-      if (T.playing) { acquireWake(); if (synth && !synth.speaking) restartSpeech(); }
+      if (NATIVE) { if (R.view === 'reader') window.KBookNativeEvent(Object.assign(nativeState(), { type: 'pos' })); }
+      else if (T.playing) { acquireWake(); if (synth && !synth.speaking) restartSpeech(); }
       // 切回來時抓一次別台裝置的最新書架與進度
       if (Date.now() - lastRefresh > 30000 && !cloudBusy) {
         lastRefresh = Date.now();

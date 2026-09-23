@@ -1792,8 +1792,23 @@ function wire() {
   // 進度列左邊的朗讀設定鈕：叫出播放面板並展開設定；已經開著就收起
   $('#btnTtsSet').onclick = () => { if (!$('#player').hidden && !$('#pOpts').hidden) hidePlayer(); else showPlayerSettings(); };
   // 進度列：拖的時候只更新數字，放開才跳段
-  $('#seekRange').addEventListener('input', e => { T.seeking = true; $('#seekPos').textContent = `${+e.target.value + 1} / ${(R.spoken || []).length}`; });
-  $('#seekRange').addEventListener('change', e => { T.seeking = false; const sp = R.spoken || []; ttsSeek(sp.length ? sp[Math.min(+e.target.value, sp.length - 1)] : 0); });
+  // 有些瀏覽器（Android Chrome）拖的過程就連發 change，每發一次就重排語音，引擎跟不上會把中途經過的段落念出來。
+  // 所以手指還按著一律不跳段，放開後再等一下才跳；放開時位置沒變就只解除拖拉狀態
+  const seek = $('#seekRange');
+  let seekTimer = null, seekDown = false;
+  const seekTo = () => {
+    clearTimeout(seekTimer);
+    seekTimer = setTimeout(() => {
+      T.seeking = false;
+      const sp = R.spoken || [], target = sp.length ? sp[Math.min(+seek.value, sp.length - 1)] : 0;
+      if (target === T.b) updatePlayer(); else ttsSeek(target);
+    }, 200);
+  };
+  seek.addEventListener('input', () => { T.seeking = true; clearTimeout(seekTimer); $('#seekPos').textContent = `${+seek.value + 1} / ${(R.spoken || []).length}`; });
+  seek.addEventListener('change', () => { if (!seekDown) seekTo(); });
+  seek.addEventListener('pointerdown', () => { seekDown = true; T.seeking = true; clearTimeout(seekTimer); });
+  const seekUp = () => { if (!seekDown) return; seekDown = false; seekTo(); };
+  window.addEventListener('pointerup', seekUp); window.addEventListener('pointercancel', seekUp);
   $('#scrim').onclick = closePanels;
   $('#btnPrev').onclick = $('#btnPrevCh').onclick = () => goChapter(R.ch - 1);
   $('#btnNext').onclick = $('#btnNextCh').onclick = () => goChapter(R.ch + 1);

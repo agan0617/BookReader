@@ -860,9 +860,11 @@ const GH = {
       const devs = Object.assign({}, e.devs);
       const mine = devs[DEV.id];
       if (mine && (mine.at || 0) > p.at) return null;
-      // 改版前留下的單一進度：比這次新才保留成一筆「先前紀錄」，免得別台讀到的位置不見
-      if (!e.devs && e.at && e.at > p.at) devs.legacy = { ch: e.ch, b: e.b, pct: e.pct, t: e.t, at: e.at, name: '先前紀錄' };
+      // 沒有 devs 的單一進度＝舊版頁面寫的（它會整筆蓋掉），一律保留成一筆，別台讀到的位置才不會不見
+      if (!e.devs && e.at) devs.legacy = { ch: e.ch, b: e.b, pct: e.pct, t: e.t, at: e.at, name: '其他裝置（舊版）' };
       devs[DEV.id] = Object.assign({}, p, { name: DEV.name });
+      // 兩台以上都已經用新格式記了，舊版那筆就用不到了
+      if (Object.keys(devs).filter(k => k !== 'legacy').length >= 2) delete devs.legacy;
       const latest = Object.values(devs).reduce((x, y) => ((y.at || 0) > (x.at || 0) ? y : x));
       o[id] = { ch: latest.ch, b: latest.b, pct: latest.pct, t: latest.t, at: latest.at, devs };
       return o;
@@ -891,7 +893,7 @@ function ownProgress(id) {
 function progressByDevice(id) {
   const c = S.progress[id], out = [];
   if (c && c.devs) Object.keys(c.devs).forEach(k => { const v = c.devs[k]; if (k !== DEV.id && v && v.at) out.push({ dev: k, name: v.name || '其他裝置', p: v, mine: false }); });
-  else if (c && c.at) out.push({ dev: 'legacy', name: '先前紀錄', p: c, mine: false });
+  else if (c && c.at) out.push({ dev: 'legacy', name: '其他裝置（舊版）', p: c, mine: false });
   const own = ownProgress(id);
   if (own) out.push({ dev: DEV.id, name: DEV.name, p: own, mine: true });
   return out.sort((a, b) => (b.p.at || 0) - (a.p.at || 0));
@@ -923,23 +925,26 @@ function renderLibrary() {
   const writable = canWrite();
   $('#btnImport').hidden = !writable;
 
-  // 繼續閱讀：最近讀的那本；各裝置位置不一樣時，底下列出其他裝置讀到哪，讓 Ken 自己選
-  let last = null;
-  books.forEach(b => { const all = progressByDevice(b.id); if (all.length && (!last || all[0].p.at > last.all[0].p.at)) last = { b, all }; });
+  // 繼續閱讀：每台裝置各取它最近讀的那本與位置（位置一樣也列），最新的放大卡片，其餘列在底下讓 Ken 自己選
+  const perDev = new Map();
+  books.forEach(b => progressByDevice(b.id).forEach(x => {
+    const cur = perDev.get(x.dev);
+    if (!cur || (x.p.at || 0) > (cur.p.at || 0)) perDev.set(x.dev, Object.assign({ b }, x));
+  }));
+  const entries = [...perDev.values()].sort((a, b) => (b.p.at || 0) - (a.p.at || 0));
   const cont = $('#continue');
-  if (last) {
-    const [top, ...rest] = last.all;
-    const others = rest.filter(x => x.p.ch !== top.p.ch || x.p.b !== top.p.b);
+  if (entries.length) {
+    const [top, ...others] = entries;
     const devLabel = x => esc(x.name) + (x.mine ? '（這台）' : '');
     const pct = Math.round((top.p.pct || 0) * 100);
-    cont.innerHTML = `<button class="continue-card" type="button" data-open="${esc(last.b.id)}" data-dev="${esc(top.dev)}">
-      ${coverHTML(last.b, false)}
-      <div style="min-width:0"><span class="eyebrow">繼續閱讀${others.length ? ' · ' + devLabel(top) : ''}</span><h2>${esc(last.b.title)}</h2>
+    cont.innerHTML = `<button class="continue-card" type="button" data-open="${esc(top.b.id)}" data-dev="${esc(top.dev)}">
+      ${coverHTML(top.b, false)}
+      <div style="min-width:0"><span class="eyebrow">繼續閱讀${others.length ? ' · ' + devLabel(top) : ''}</span><h2>${esc(top.b.title)}</h2>
       <p>第 ${top.p.ch + 1} 章${top.p.t ? ' · ' + esc(top.p.t) : ''} · 已讀 ${pct}% · ${fmtAgo(top.p.at)}</p>
       <div class="bar"><i style="width:${pct}%"></i></div></div>
       <span class="go">${I.arrow}</span></button>` +
-      (others.length ? `<div class="dev-list">${others.map(x => `<button class="dev-row" type="button" data-open="${esc(last.b.id)}" data-dev="${esc(x.dev)}">
-        <b>${devLabel(x)}</b><span class="t">第 ${x.p.ch + 1} 章${x.p.t ? ' · ' + esc(x.p.t) : ''}</span><span>${Math.round((x.p.pct || 0) * 100)}% · ${fmtAgo(x.p.at)}</span></button>`).join('')}</div>` : '');
+      (others.length ? `<div class="dev-list">${others.map(x => `<button class="dev-row" type="button" data-open="${esc(x.b.id)}" data-dev="${esc(x.dev)}">
+        <b>${devLabel(x)}</b><span class="t">${x.b.id !== top.b.id ? '《' + esc(x.b.title) + '》' : ''}第 ${x.p.ch + 1} 章${x.p.t ? ' · ' + esc(x.p.t) : ''}</span><span>${Math.round((x.p.pct || 0) * 100)}% · ${fmtAgo(x.p.at)}</span></button>`).join('')}</div>` : '');
     cont.hidden = false;
   } else cont.hidden = true;
 

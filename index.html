@@ -2,9 +2,9 @@
 <html lang="zh-Hant">
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="apple-mobile-web-app-title" content="書匣">
+<meta name="apple-mobile-web-app-title" content="K書吧">
 <meta name="referrer" content="no-referrer">
-<title>書匣</title>
+<title>K書吧</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=LXGW+WenKai+TC:wght@400;700&family=Noto+Sans+TC:wght@400;500;700&family=Noto+Serif+TC:wght@400;600;700&display=swap">
@@ -235,7 +235,7 @@ body.player-open .toast{bottom:calc(150px + env(safe-area-inset-bottom,0px))}
 <div id="library">
   <header class="lib-head wrap">
     <div>
-      <h1 class="wordmark">書匣</h1>
+      <h1 class="wordmark">K書吧</h1>
       <p class="lib-sub" id="libSub">正在打開書架…</p>
     </div>
     <div class="lib-actions">
@@ -458,35 +458,35 @@ const savePrefs = () => LS.set('prefs', prefs);
 
 /* ───────── 內建說明書 ───────── */
 const GUIDE_ID = '__guide';
-const GUIDE_MD = `# 書匣使用說明
-作者：書匣
+const GUIDE_MD = `# K書吧使用說明
+作者：K書吧
 
 ## 把書放上書架
-書匣讀的是純文字書檔：**.md**（Markdown）或 **.txt**。叫 AI 寫好的書，存成其中一種就能放進來。
+K書吧讀的是純文字書檔：**.md**（Markdown）或 **.txt**。叫 AI 寫好的書，存成其中一種就能放進來。
 
 - **匯入檔案**：右上角「匯入檔案」，一次可以選好幾個。選了多個檔案時，會問你要「各自成書」，還是「依檔名順序合併成一本」——AI 常常一章一個檔，合併後每個檔就是一章。
 - **拖進視窗**：電腦上直接把檔案拖到書架上。
 - **同名的書**：再匯入一次同書名的檔案，可以選「取代舊版」，閱讀進度會保留。書改版重寫時用這個。
 - 也可以直接請 Claude 把寫好的書放上書架。
 
-書在兩個地方各有一份：**每台裝置的瀏覽器裡**一份，**你的私有 GitHub repo（BookShelf）**一份。每次打開書匣，會先擺出這台裝置上的書，再跟 GitHub 比對：有新書就下載、改版就更新、別台裝置刪掉的就移除。所以沒網路也能讀已經下載的書，打開也比較快。
+書在兩個地方各有一份：**每台裝置的瀏覽器裡**一份，**你的私有 GitHub repo（BookShelf）**一份。每次打開K書吧，會先擺出這台裝置上的書，再跟 GitHub 比對：有新書就下載、改版就更新、別台裝置刪掉的就移除。所以沒網路也能讀已經下載的書，打開也比較快。
 
 閱讀進度也存在 GitHub，手機和電腦共用同一份。換章、回書架、離開頁面時會同步，讀同一章很久時最多每 3 分鐘存一次。
 
 ## 在新裝置上連上書架
-每台裝置（手機、電腦各自的瀏覽器）第一次打開書匣時，要貼一次 GitHub token：
+每台裝置（手機、電腦各自的瀏覽器）第一次打開K書吧時，要貼一次 GitHub token：
 
 1. 到 GitHub 的 Settings → Developer settings → Personal access tokens → **Fine-grained tokens**，按 Generate new token。
 2. **Repository access** 選 Only select repositories，只勾 **BookShelf**。
 3. **Permissions** 裡的 **Contents** 設成 **Read and write**，其他都不用開。
-4. 產生後複製 token，回書匣按右上角的連線狀態，貼上後按「連線」。
+4. 產生後複製 token，回K書吧按右上角的連線狀態，貼上後按「連線」。
 
 token 只存在那台裝置的瀏覽器裡，不會送到 GitHub 以外的地方。token 過期或換手機時，照上面的步驟重貼一次。手機弄丟時，到 GitHub 把那個 token 刪掉就好。
 
-在 iPhone 上建議用 Safari 把書匣「加入主畫面」，從主畫面圖示打開。太久沒打開時，Safari 可能會清掉網頁存的資料（包括 token 和本機的書），加到主畫面就不會被清。要是被清掉了，重貼 token，書會從 GitHub 再下載一次。
+在 iPhone 上建議用 Safari 把K書吧「加入主畫面」，從主畫面圖示打開。太久沒打開時，Safari 可能會清掉網頁存的資料（包括 token 和本機的書），加到主畫面就不會被清。要是被清掉了，重貼 token，書會從 GitHub 再下載一次。
 
 ## 章節怎麼切
-書匣會自動找章節，不用自己設定：
+K書吧會自動找章節，不用自己設定：
 
 1. Markdown：取最高一層、出現兩次以上的標題當章節。常見寫法是一個「# 書名」，底下每章一個「## 第一章 章名」。
 2. 純文字：獨立成一行的「第一章」「第十二回」「序章」「楔子」「後記」「番外」「Chapter 3」都會被認成章節標題。
@@ -528,7 +528,7 @@ token 只存在那台裝置的瀏覽器裡，不會送到 GitHub 以外的地方
 
 ---
 
-這本說明是書匣內建的，不佔書架空間，也刪不掉。
+這本說明是K書吧內建的，不佔書架空間，也刪不掉。
 `;
 
 /* ───────── 解析書檔 → 章節 ───────── */
@@ -831,7 +831,7 @@ function getProgress(id) {
   if (!a) return b; if (!b) return a;
   return (a.at || 0) >= (b.at || 0) ? a : b;
 }
-const guideBook = () => ({ id: GUIDE_ID, title: '書匣使用說明', author: '書匣', format: 'md', builtin: true, chars: countChars(GUIDE_MD), chapters: 6, addedAt: 0 });
+const guideBook = () => ({ id: GUIDE_ID, title: 'K書吧使用說明', author: 'K書吧', format: 'md', builtin: true, chars: countChars(GUIDE_MD), chapters: 6, addedAt: 0 });
 
 /* ───────── 書架畫面 ───────── */
 function coverHTML(b, withAuthor = true) {
@@ -886,7 +886,7 @@ function renderLibrary() {
   } else if (S.mode === 'error') {
     html = `<p class="empty">${books.length ? '沒連上 GitHub，下面是這台裝置上的書，可以照常讀；新增或刪書要等連上之後。' : '書架讀不到。'}<br>${esc(S.err)}<br><button class="btn primary" type="button" data-connect style="margin-top:12px">重新連線</button></p>` + html;
   } else if (S.loaded && !books.length) {
-    html = `<p class="empty">書架上還沒有書。${writable ? '按右上角「匯入檔案」選 AI 寫好的 .md／.txt' + (coarse ? '' : '，也可以把檔案直接拖進這個視窗') + '。' : ''}旁邊那本說明寫了書匣怎麼切章節、怎麼朗讀。</p>` + html;
+    html = `<p class="empty">書架上還沒有書。${writable ? '按右上角「匯入檔案」選 AI 寫好的 .md／.txt' + (coarse ? '' : '，也可以把檔案直接拖進這個視窗') + '。' : ''}旁邊那本說明寫了K書吧怎麼切章節、怎麼朗讀。</p>` + html;
   }
   $('#grid').innerHTML = html;
 }

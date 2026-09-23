@@ -1,4 +1,4 @@
-# 書匣 BookReader
+# K書吧 BookReader
 
 讀 AI 寫的書用的閱讀器，整個程式就是一個 `index.html`，用 GitHub Pages 發佈：
 
@@ -13,7 +13,7 @@
 1. GitHub → Settings → Developer settings → Personal access tokens → **Fine-grained tokens** → Generate new token
 2. Repository access：**Only select repositories** → 只選 `BookShelf`
 3. Permissions：**Contents** 設成 **Read and write**（Metadata 會自動變成唯讀，其他都不用開）
-4. 打開書匣，點右上角的連線狀態 → 貼上 token → 連線
+4. 打開K書吧，點右上角的連線狀態 → 貼上 token → 連線
 
 ## 功能
 

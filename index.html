@@ -107,6 +107,12 @@ button.chip:hover{border-color:var(--faint)}
 
 .shelf-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:30px 0 16px}
 .shelf-head h2{margin:0;font-family:var(--f-display);font-size:17px;font-weight:600;letter-spacing:.18em}
+.tag-bar{display:flex;gap:8px;margin:-6px 0 18px;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+.tag-bar::-webkit-scrollbar{display:none}
+.tag-bar .chip{flex:none;cursor:pointer;color:var(--ink);white-space:nowrap;font-variant-numeric:tabular-nums}
+.tag-bar .chip b{font-weight:500;color:var(--faint)}
+.tag-bar .chip[aria-pressed="true"]{border-color:var(--accent);color:var(--accent);background:color-mix(in srgb,var(--accent) 10%,var(--surface))}
+.tag-bar .chip[aria-pressed="true"] b{color:var(--accent)}
 select{height:36px;padding:0 10px;border-radius:8px;border:1px solid var(--line);background:var(--raised);font-size:13.5px;max-width:100%}
 .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(112px,1fr));gap:30px 18px;padding-bottom:64px}
 @media (min-width:700px){.grid{grid-template-columns:repeat(auto-fill,minmax(142px,1fr));gap:34px 26px}}
@@ -124,7 +130,7 @@ select{height:36px;padding:0 10px;border-radius:8px;border:1px solid var(--line)
   box-shadow:inset 0 0 0 2.5cqw #F3EEE2,inset 0 0 0 calc(2.5cqw + 1px) rgba(36,33,29,.4);
   writing-mode:vertical-rl;font-family:var(--f-display);font-weight:600;font-size:10.5cqw;line-height:1.15;letter-spacing:.06em;overflow:hidden;display:flex;align-items:center}
 .cover .auth{position:absolute;left:17%;bottom:7%;writing-mode:vertical-rl;font-family:var(--f-display);font-size:7cqw;letter-spacing:.1em;color:rgba(255,255,255,.72);max-height:40%;overflow:hidden}
-.cover .tag{position:absolute;left:17%;top:7%;font-size:7cqw;letter-spacing:.2em;color:rgba(255,255,255,.72);writing-mode:vertical-rl}
+.cover .tag{position:absolute;left:17%;top:7%;font-size:7cqw;letter-spacing:.2em;color:rgba(255,255,255,.72);writing-mode:vertical-rl;max-height:42%;overflow:hidden}
 .book-title{margin:0;font-family:var(--f-display);font-weight:600;font-size:15px;line-height:1.35;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;text-wrap:balance}
 .book-meta{display:flex;align-items:center;justify-content:space-between;gap:6px;color:var(--muted);font-size:12.5px;font-variant-numeric:tabular-nums;margin-top:-4px}
 .book-meta .more{width:30px;height:30px;margin-right:-6px;border-radius:8px}
@@ -288,6 +294,7 @@ body.ttsbar-on.player-open .toast{bottom:calc(150px + var(--ttsbar-h))}
         <option value="title">書名</option>
       </select>
     </div>
+    <div class="tag-bar" id="tagBar" hidden></div>
     <div class="grid" id="grid"></div>
   </main>
 </div>
@@ -504,7 +511,7 @@ const FONTS = {
 };
 const WIDTHS = { s: '30em', m: '38em', l: '48em' };
 const storedPrefs = LS.get('prefs', null);
-const prefs = Object.assign({ fs: matchMedia('(max-width: 600px)').matches ? 19 : 21, lh: 1.9, font: 'serif', theme: 'auto', width: 'm', indent: true, rate: 1, voice: '', volume: 1, sleep: '0', sort: 'recent' }, storedPrefs || {});
+const prefs = Object.assign({ fs: matchMedia('(max-width: 600px)').matches ? 19 : 21, lh: 1.9, font: 'serif', theme: 'auto', width: 'm', indent: true, rate: 1, voice: '', volume: 1, sleep: '0', sort: 'recent', tag: '' }, storedPrefs || {});
 const savePrefs = () => LS.set('prefs', prefs);
 
 /* ───────── 內建說明書 ───────── */
@@ -518,6 +525,7 @@ K書吧讀的是純文字書檔：**.md**（Markdown）或 **.txt**。叫 AI 寫
 - **匯入檔案**：右上角「匯入檔案」，一次可以選好幾個。選了多個檔案時，會問你要「各自成書」，還是「依檔名順序合併成一本」——AI 常常一章一個檔，合併後每個檔就是一章。
 - **拖進視窗**：電腦上直接把檔案拖到書架上。
 - **同名的書**：再匯入一次同書名的檔案，可以選「取代舊版」，閱讀進度會保留。書改版重寫時用這個。
+- **標籤**：書檔開頭的 frontmatter 寫一行「tags: 遊戲, 日本史」，匯入後書架標題下會多一排標籤，點一個就只看那一類的書（再點一次回到全部）。沒寫的書按書卡的「⋯」→ 編輯，在「標籤」欄用逗號分隔填。
 - 也可以直接請 Claude 把寫好的書放上書架。
 
 書在兩個地方各有一份：**每台裝置的瀏覽器裡**一份，**你的私有 GitHub repo** BookShelf 一份。每次打開K書吧，會先擺出這台裝置上的書，再跟 GitHub 比對：有新書就下載、改版就更新、別台裝置刪掉的就移除。所以沒網路也能讀已經下載的書，打開也比較快。
@@ -1007,10 +1015,10 @@ const guideBook = () => ({ id: GUIDE_ID, title: 'K書吧使用說明', author: '
 
 /* ───────── 書架畫面 ───────── */
 function coverHTML(b, withAuthor = true) {
-  return `<div class="cover" style="--c:${coverColor(b)}">${b.builtin ? '<span class="tag">說明</span>' : ''}<div class="slip">${esc(b.title)}</div>${withAuthor && b.author && !b.builtin ? `<span class="auth">${esc(b.author)}</span>` : ''}</div>`;
+  return `<div class="cover" style="--c:${coverColor(b)}">${b.builtin ? '<span class="tag">說明</span>' : bookTags(b)[0] ? `<span class="tag">${esc(bookTags(b)[0])}</span>` : ''}<div class="slip">${esc(b.title)}</div>${withAuthor && b.author && !b.builtin ? `<span class="auth">${esc(b.author)}</span>` : ''}</div>`;
 }
-function sortedBooks() {
-  const list = S.books.slice();
+function sortedBooks(src = S.books) {
+  const list = src.slice();
   const lastAt = b => newestAt(b.id);
   if (prefs.sort === 'title') list.sort((a, b) => a.title.localeCompare(b.title, 'zh-Hant', { numeric: true }));
   else if (prefs.sort === 'added') list.sort((a, b) => (b.addedAt || 0) - (a.addedAt || 0));
@@ -1019,8 +1027,21 @@ function sortedBooks() {
 }
 function renderLibrary() {
   const books = S.books;
-  const total = books.reduce((s, b) => s + (b.chars || 0), 0);
-  $('#libSub').textContent = !S.loaded ? '正在打開書架…' : (S.mode === 'setup' || (S.mode === 'error' && !books.length)) ? '還沒連上書架' : books.length ? `${books.length} 本書 · 共 ${fmtChars(total)}` : '書架還是空的';
+  // 標籤列：有任何一本書打了標籤才出現，依書數排；選的標籤已經沒書就退回全部。只篩書架，不動「繼續閱讀」
+  const tagCount = new Map(); let untagged = 0;
+  books.forEach(b => { const ts = bookTags(b); if (!ts.length) untagged++; ts.forEach(t => tagCount.set(t, (tagCount.get(t) || 0) + 1)); });
+  if (prefs.tag && !(prefs.tag === NO_TAG ? untagged && tagCount.size : tagCount.has(prefs.tag))) { prefs.tag = ''; savePrefs(); }
+  const tagBar = $('#tagBar');
+  tagBar.hidden = !tagCount.size;
+  if (tagCount.size) {
+    const tags = [...tagCount].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], 'zh-Hant', { numeric: true }));
+    const chip = (key, label, n) => `<button class="chip" type="button" data-tag="${esc(key)}" aria-pressed="${prefs.tag === key}">${esc(label)} <b>${n}</b></button>`;
+    tagBar.innerHTML = chip('', '全部', books.length) + tags.map(([t, n]) => chip(t, t, n)).join('') + (untagged ? chip(NO_TAG, '未分類', untagged) : '');
+  }
+  const shown = !prefs.tag ? books : books.filter(b => prefs.tag === NO_TAG ? !bookTags(b).length : bookTags(b).includes(prefs.tag));
+  const total = shown.reduce((s, b) => s + (b.chars || 0), 0);
+  const tagLabel = prefs.tag ? (prefs.tag === NO_TAG ? '未分類' : prefs.tag) + ' · ' : '';
+  $('#libSub').textContent = !S.loaded ? '正在打開書架…' : (S.mode === 'setup' || (S.mode === 'error' && !books.length)) ? '還沒連上書架' : books.length ? `${tagLabel}${shown.length} 本書 · 共 ${fmtChars(total)}` : '書架還是空的';
   const writable = canWrite();
   $('#btnImport').hidden = !writable;
 
@@ -1042,7 +1063,7 @@ function renderLibrary() {
     cont.hidden = false;
   } else cont.hidden = true;
 
-  const cards = sortedBooks().concat([guideBook()]).map(b => {
+  const cards = sortedBooks(shown).concat(prefs.tag ? [] : [guideBook()]).map(b => {
     const p = getProgress(b.id);
     const pct = p ? Math.round((p.pct || 0) * 100) : 0;
     const chs = b.chapters || 0;
@@ -1094,6 +1115,19 @@ async function readFileText(f) {
 }
 const fmtOf = (name, text) => /\.(txt|text)$/i.test(name) ? 'txt' : /\.(md|markdown)$/i.test(name) ? 'md' : (/^#{1,6}\s/m.test(text) ? 'md' : 'txt');
 const baseName = n => n.replace(/\.[^.]+$/, '');
+/* 標籤：每本最多 8 個、每個最多 20 字；接受逗號、頓號、分號分隔，也接受 [a, b] 這種寫法 */
+function normTags(v) {
+  const arr = Array.isArray(v) ? v : String(v ?? '').replace(/^\s*\[|\]\s*$/g, '').split(/[,，、;；]/);
+  const out = [];
+  for (let t of arr) {
+    t = String(t).trim().replace(/^["']|["']$/g, '').trim().slice(0, 20);
+    if (t && !out.includes(t)) out.push(t);
+    if (out.length >= 8) break;
+  }
+  return out;
+}
+const bookTags = b => Array.isArray(b.tags) ? b.tags : [];
+const NO_TAG = '__none';
 
 async function importFiles(fileList) {
   if (!canWrite()) { toast('這個檢視沒有寫入權限'); return; }
@@ -1143,6 +1177,9 @@ async function addOne(text, format, fallbackTitle, forcedTitle, forcedAuthor) {
     author: String(forcedAuthor || parsed.meta.author || '').trim().slice(0, 80),
     format, chars: countChars(text), chapters: parsed.chapters.length
   };
+  // 檔頭 tags: 遊戲, 日本史 → 書目的 tags；沒寫就不帶（取代舊版時保留原本的標籤）
+  const tags = normTags(parsed.meta.tags ?? parsed.meta.tag);
+  if (tags.length) meta.tags = tags;
   const dup = S.books.find(b => b.title === meta.title);
   let how = 'new';
   if (dup) {
@@ -1188,6 +1225,7 @@ function editDialog(book) {
     <form id="editForm">
       <label for="eTitle">書名</label><input type="text" id="eTitle" value="${esc(book.title)}" required>
       <label for="eAuthor">作者</label><input type="text" id="eAuthor" value="${esc(book.author || '')}">
+      <label for="eTags">標籤</label><input type="text" id="eTags" value="${esc(bookTags(book).join(', '))}" placeholder="用逗號分隔，例：遊戲, 日本史">
       <p class="hint">${fmtChars(book.chars)} · ${book.chapters || 0} 章 · ${book.format === 'txt' ? '純文字' : 'Markdown'} · 加入於 ${new Date(book.addedAt || Date.now()).toLocaleDateString('zh-TW')}</p>
       <div class="actions"><button class="btn danger left" type="button" data-del>刪除這本</button><button class="btn" type="button" data-x>取消</button><button class="btn primary" type="submit">儲存</button></div>
     </form>`);
@@ -1200,10 +1238,10 @@ function editDialog(book) {
   };
   p.querySelector('#editForm').addEventListener('submit', async e => {
     e.preventDefault();
-    const title = $('#eTitle').value.trim().slice(0, 120), author = $('#eAuthor').value.trim().slice(0, 80);
+    const title = $('#eTitle').value.trim().slice(0, 120), author = $('#eAuthor').value.trim().slice(0, 80), tags = normTags($('#eTags').value);
     if (!title) return;
     closeModal();
-    try { await S.backend.update(book.id, { title, author }); toast('已儲存'); } catch (err) { toast(errMsg(err), 5000); }
+    try { await S.backend.update(book.id, { title, author, tags }); toast('已儲存'); } catch (err) { toast(errMsg(err), 5000); }
   });
 }
 
@@ -1827,6 +1865,8 @@ function wire() {
   $('#syncChip').onclick = connectDialog;
   $('#library').addEventListener('click', e => {
     if (e.target.closest('[data-connect]')) { connectDialog(); return; }
+    const tg = e.target.closest('[data-tag]');
+    if (tg) { prefs.tag = tg.dataset.tag === prefs.tag ? '' : tg.dataset.tag; savePrefs(); renderLibrary(); return; }
     const ed = e.target.closest('[data-edit]');
     if (ed) { const b = S.books.find(x => x.id === ed.dataset.edit); if (b) editDialog(b); return; }
     if (e.target.closest('[data-slots]')) { slotsDialog(); return; }

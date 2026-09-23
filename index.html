@@ -536,7 +536,7 @@ K書吧會自動找章節，不用自己設定：
 - 播放面板右邊的 **✕** 只是把面板收起來，朗讀會繼續；上方的耳機會亮著，點它就停，點設定鈕再把面板叫出來。
 - 可以調**速度**、**音量**、換**語音**，這些設定每台裝置各自記住，下次打開還在。iPhone／iPad 的 Safari 不理會網頁設的朗讀音量，要用手機的音量鍵調。用的是瀏覽器或系統內建的語音，Windows 上建議選名稱有「Chinese (Traditional, Taiwan)」的那個。
 - **定時停止**：15 到 60 分鐘，或念完這一章就停，適合睡前聽。選過的時間會記住，下次開始朗讀時自動套用。
-- 朗讀會**跳過程式碼區塊**，以及標題叫「參考資料」「參考文獻」「References」這類的整節（到下一個同級標題為止），正文裡的網址也不念；畫面上照樣看得到。
+- 朗讀會**跳過程式碼區塊**，以及標題叫「參考資料」「參考文獻」「References」這類的整節（到下一個同級標題為止），正文裡的網址和 [4] 這種出處編號也不念；畫面上照樣看得到。
 - 朗讀時會盡量讓螢幕保持亮著。切到別的 App 或鎖定螢幕時，K書吧 會設法讓朗讀繼續，通知欄和鎖定畫面也有播放、暫停、上一段／下一段的按鈕；不過有些手機的瀏覽器還是會把朗讀停掉，回到 K書吧 就會接著念。
 - **Android 上想關螢幕聽書**：用 K書吧 App。App 裡的朗讀交給手機的語音引擎，切 App、鎖螢幕都會繼續念；語音清單是手機裝的語音。App 的瀏覽器資料跟 Chrome 分開，第一次打開要再貼一次 token。
 
@@ -1394,7 +1394,9 @@ function silentFlags(blocks) {
     return skip > 0 || !!el.closest('pre');
   });
 }
-const speechText = (el, silent) => silent ? '' : el.textContent.replace(/https?:\/\/\S+/g, ' ').replace(/\s+/g, ' ').trim();
+// 出處編號 [4]、[9][10]、[1, 3] 也不念；前面緊貼英數字的（slice[0]）或四位數以上的（[2019]）不算
+const CITE_RE = /(?<![\w)\]])(?:\[\d{1,3}(?:\s*[,，、–-]\s*\d{1,3})*\])+/g;
+const speechText = (el, silent) => silent ? '' : el.textContent.replace(/https?:\/\/\S+/g, ' ').replace(CITE_RE, '').replace(/\s+/g, ' ').trim();
 
 function chapterBlocks(c) {
   if (!c.html) { try { c.html = sanitize(c.render()); } catch { c.html = ''; } }

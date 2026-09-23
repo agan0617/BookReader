@@ -695,7 +695,16 @@ const b64enc = s => { const u = new TextEncoder().encode(s); let bin = ''; for (
 const b64dec = s => new TextDecoder().decode(Uint8Array.from(atob(String(s).replace(/\s/g, '')), c => c.charCodeAt(0)));
 const encPath = p => p.split('/').map(encodeURIComponent).join('/');
 const newId = () => 'b' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
-const bookFile = (id, format) => `books/${id}.${format === 'txt' ? 'txt' : 'md'}`;
+const idFile = (id, format) => `books/${id}.${format === 'txt' ? 'txt' : 'md'}`;  // 舊書（書目沒記 file）的檔名
+// 書檔用書名當檔名（檔名不收的字元換成底線）；跟別本撞名就加 (2)、(3)…。規則要跟 ClaudeBot 的 Publish-Book.ps1 一致
+const titleFile = (title, format, id, books) => {
+  const ext = format === 'txt' ? 'txt' : 'md';
+  const name = String(title || '').replace(/[\\/:*?"<>|\x00-\x1f]/g, '_').trim().replace(/[. ]+$/, '').slice(0, 80).trim() || id;
+  const taken = new Set(books.filter(b => b.id !== id && b.file).map(b => b.file.toLowerCase()));
+  let file = `books/${name}.${ext}`;
+  for (let n = 2; taken.has(file.toLowerCase()); n++) file = `books/${name} (${n}).${ext}`;
+  return file;
+};
 class GhError extends Error { constructor(status, msg) { super(msg); this.status = status; this.code = status ? 'gh_' + status : 'gh_net'; } }
 
 const GH = {
@@ -780,14 +789,14 @@ const GH = {
     return !(repo.permissions && repo.permissions.push === false);
   },
   async add(meta, text) {
-    const id = newId(), file = bookFile(id, meta.format), now = Date.now();
+    const id = newId(), file = titleFile(meta.title, meta.format, id, this.lib.books), now = Date.now();
     await this.put(file, text, null, `上架《${meta.title}》`);
     await this.mutate('lib', lib => { lib.books.push(Object.assign({ id }, meta, { file, addedAt: now, updatedAt: now })); return lib; }, `書目：加入《${meta.title}》`);
     textCache.set(id, text); Store.set('text:' + id, { text, ver: now });
     return id;
   },
   async replace(book, meta, text) {
-    const file = bookFile(book.id, meta.format), now = Date.now();
+    const file = titleFile(meta.title, meta.format, book.id, this.lib.books), now = Date.now();
     await this.put(file, text, await this.sha(file), `改版《${meta.title}》`);
     if (book.file && book.file !== file) await this.del(book.file, `移除舊檔《${book.title}》`).catch(() => {});
     await this.mutate('lib', lib => { const b = lib.books.find(x => x.id === book.id); if (!b) return null; Object.assign(b, meta, { file, updatedAt: now }); return lib; }, `書目：改版《${meta.title}》`);
@@ -795,9 +804,21 @@ const GH = {
   },
   async update(id, patch) {
     const now = Date.now();
-    // 只改書名／作者，書檔沒變：本機副本先換成新版本號，免得重抓
+    // 改了書名：書檔跟著改名（先寫新檔、書目指過去，再刪舊檔）
+    const book = this.lib.books.find(x => x.id === id);
+    const oldFile = book && (book.file || idFile(id, book.format));
+    if (book && patch.title && patch.title !== book.title) {
+      const file = titleFile(patch.title, book.format, id, this.lib.books);
+      if (file !== oldFile) {
+        const text = await this.text(book);
+        await this.put(file, text, await this.sha(file), `改名《${book.title}》→《${patch.title}》`);
+        patch = Object.assign({}, patch, { file });
+      }
+    }
+    // 書檔內容沒變：本機副本先換成新版本號，免得重抓
     const c = await Store.get('text:' + id); if (c) await Store.set('text:' + id, { text: c.text, ver: now });
     await this.mutate('lib', lib => { const b = lib.books.find(x => x.id === id); if (!b) return null; Object.assign(b, patch, { updatedAt: now }); return lib; }, `書目：修改《${patch.title || id}》`);
+    if (patch.file) this.del(oldFile, `移除舊檔《${book.title}》`).catch(() => {});
   },
   async remove(book) {
     await this.mutate('lib', lib => { lib.books = lib.books.filter(x => x.id !== book.id); return lib; }, `下架《${book.title}》`);
@@ -815,7 +836,7 @@ const GH = {
       throw new Error('這本書還沒下載到這台裝置，連上 GitHub 後再開');
     }
     let r;
-    try { r = await this.api(`contents/${encPath(book.file || bookFile(book.id, book.format))}?${this.ref()}`, { headers: { Accept: 'application/vnd.github.raw+json' } }); }
+    try { r = await this.api(`contents/${encPath(book.file || idFile(book.id, book.format))}?${this.ref()}`, { headers: { Accept: 'application/vnd.github.raw+json' } }); }
     catch (e) { if (c && typeof c.text === 'string') { textCache.set(book.id, c.text); return c.text; } throw e; }
     const t = await r.text();
     textCache.set(book.id, t); Store.set('text:' + book.id, { text: t, ver: book.updatedAt });

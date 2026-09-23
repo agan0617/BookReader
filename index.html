@@ -536,6 +536,7 @@ K書吧會自動找章節，不用自己設定：
 - 播放面板右邊的 **✕** 只是把面板收起來，朗讀會繼續；上方的耳機會亮著，點它就停，點設定鈕再把面板叫出來。
 - 可以調**速度**、**音量**、換**語音**，這些設定每台裝置各自記住，下次打開還在。iPhone／iPad 的 Safari 不理會網頁設的朗讀音量，要用手機的音量鍵調。用的是瀏覽器或系統內建的語音，Windows 上建議選名稱有「Chinese (Traditional, Taiwan)」的那個。
 - **定時停止**：15 到 60 分鐘，或念完這一章就停，適合睡前聽。選過的時間會記住，下次開始朗讀時自動套用。
+- 朗讀會**跳過程式碼區塊**，以及標題叫「參考資料」「參考文獻」「References」這類的整節（到下一個同級標題為止），正文裡的網址也不念；畫面上照樣看得到。
 - 朗讀時會盡量讓螢幕保持亮著。切到別的 App 或鎖定螢幕時，K書吧 會設法讓朗讀繼續，通知欄和鎖定畫面也有播放、暫停、上一段／下一段的按鈕；不過有些手機的瀏覽器還是會把朗讀停掉，回到 K書吧 就會接著念。
 - **Android 上想關螢幕聽書**：用 K書吧 App。App 裡的朗讀交給手機的語音引擎，切 App、鎖螢幕都會繼續念；語音清單是手機裝的語音。App 的瀏覽器資料跟 Chrome 分開，第一次打開要再貼一次 token。
 
@@ -1162,6 +1163,7 @@ function openChapter(i, { block = 0 } = {}) {
   art.querySelectorAll('a[href]').forEach(a => { a.target = '_blank'; a.rel = 'noopener'; });
   R.blocks = $$('h1,h2,h3,h4,h5,h6,p,li,pre,blockquote,tr', art).filter(el => !el.querySelector('p,li,pre,tr,h1,h2,h3,h4,h5,h6'));
   R.blocks.forEach((el, k) => { el.dataset.b = k; });
+  R.silent = silentFlags(R.blocks);
   $('#rChap').textContent = c.title;
   $('#chPos').textContent = `第 ${i + 1} / ${R.chapters.length} 章`;
   $('#btnPrev').disabled = i === 0;
@@ -1374,13 +1376,34 @@ const T = { playing: false, b: 0, s: 0, chunks: null, gen: 0, utter: null, errs:
    App 念到哪一段用 window.KBookNativeEvent 回報，網頁照著換章、標示段落、存進度。 */
 const NATIVE = (window.KBookNative && typeof window.KBookNative.start === 'function') ? window.KBookNative : null;
 const canSpeak = () => !!(synth || NATIVE);
+
+/* 朗讀時不念的段落：程式碼區塊，以及「參考資料」這類標題底下整節（一路到下一個同級或更高的標題）。
+   念網址和程式碼沒人聽得懂。段落照樣留在清單裡、只是文字給空字串，段落編號才不會跟畫面錯開；
+   網頁的 speakNext 遇到空段落直接跳過，App 那邊空段落只會念一個全形空白。 */
+const SILENT_HEAD_RE = /^(參考資料|参考资料|参考資料|參考文獻|参考文献|引用資料|資料來源|资料来源|出處|出处|references?|bibliography|sources)\s*[:：]?$/i;
+function silentFlags(blocks) {
+  let skip = 0; // 正在跳過的那節的標題層級，0 = 沒在跳
+  return blocks.map(el => {
+    const h = /^H([1-6])$/.exec(el.tagName);
+    if (h) {
+      const lv = +h[1];
+      if (skip && lv <= skip) skip = 0;
+      if (!skip && SILENT_HEAD_RE.test(el.textContent.trim())) skip = lv;
+      return skip > 0;
+    }
+    return skip > 0 || !!el.closest('pre');
+  });
+}
+const speechText = (el, silent) => silent ? '' : el.textContent.replace(/https?:\/\/\S+/g, ' ').replace(/\s+/g, ' ').trim();
+
 function chapterBlocks(c) {
   if (!c.html) { try { c.html = sanitize(c.render()); } catch { c.html = ''; } }
   const tpl = document.createElement('template'); tpl.innerHTML = c.html;
   // 跟 openChapter 取 R.blocks 的規則一致，段落編號才對得上
-  return [...tpl.content.querySelectorAll('h1,h2,h3,h4,h5,h6,p,li,pre,blockquote,tr')]
-    .filter(el => !el.querySelector('p,li,pre,tr,h1,h2,h3,h4,h5,h6'))
-    .map(el => el.textContent.replace(/\s+/g, ' ').trim());
+  const blocks = [...tpl.content.querySelectorAll('h1,h2,h3,h4,h5,h6,p,li,pre,blockquote,tr')]
+    .filter(el => !el.querySelector('p,li,pre,tr,h1,h2,h3,h4,h5,h6'));
+  const silent = silentFlags(blocks);
+  return blocks.map((el, k) => speechText(el, silent[k]));
 }
 function nativeSleepArg() {
   if (T.stopAtChEnd) return 'ch';
@@ -1412,7 +1435,7 @@ window.KBookNativeEvent = e => {
   updatePlayer();
 };
 
-function blockText(i) { const el = R.blocks[i]; return el ? el.textContent.replace(/\s+/g, ' ').trim() : ''; }
+function blockText(i) { const el = R.blocks[i]; return el ? speechText(el, R.silent && R.silent[i]) : ''; }
 function chunksOf(text) {
   if (!text) return [];
   const sentences = text.match(/[^。！？!?；;…]+[。！？!?；;…]*[」』”’"'）)]*|[。！？!?；;…]+/g) || [text];

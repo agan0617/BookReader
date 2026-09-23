@@ -265,6 +265,7 @@ body.player-open .toast{bottom:calc(150px + env(safe-area-inset-bottom,0px))}
     <div class="rtitle"><b id="rBook"></b><span id="rChap"></span></div>
     <button class="icon" id="btnToc" type="button" aria-label="目錄"></button>
     <button class="icon aa" id="btnAa" type="button" aria-label="閱讀設定">Aa</button>
+    <button class="icon" id="btnTtsSet" type="button" aria-label="朗讀設定" title="朗讀設定"></button>
     <button class="icon" id="btnTts" type="button" aria-label="朗讀"></button>
   </header>
   <main class="rmain">
@@ -521,7 +522,7 @@ K書吧會自動找章節，不用自己設定：
 ## 朗讀
 點右上角的**耳機**，會從畫面上的段落開始念。念到哪一段會標出來並自動捲動，章尾接著念下一章。
 
-**點一下內文**會叫出下方的播放面板和朗讀設定（速度、語音、定時停止、音量），不會馬上開始念，按播放鍵才念。
+耳機左邊的**設定鈕**會叫出下方的播放面板和朗讀設定（速度、語音、定時停止、音量），不會馬上開始念，按播放鍵才念；再按一次就收起。
 
 - 朗讀時**點任何一段**，就從那一段開始念。
 - 播放面板右邊的 **✕** 只是把面板收起來，朗讀會繼續；上方的耳機會亮著，點它再把面板叫出來。要停就按暫停。
@@ -1574,13 +1575,13 @@ function releaseWake() { try { if (T.wake) T.wake.release(); } catch {} T.wake =
 
 /* ───────── 事件 ───────── */
 function wire() {
-  $('#btnBack').innerHTML = I.back; $('#btnToc').innerHTML = I.toc; $('#btnTts').innerHTML = I.phones;
+  $('#btnBack').innerHTML = I.back; $('#btnToc').innerHTML = I.toc; $('#btnTts').innerHTML = I.phones; $('#btnTtsSet').innerHTML = I.tune;
   $$('[data-close]').forEach(b => { b.innerHTML = I.close; b.addEventListener('click', closePanels); });
   $('#pPrev').innerHTML = I.prev; $('#pNext').innerHTML = I.next; $('#pPlay').innerHTML = I.play;
   $('#pTune').innerHTML = I.tune; $('#pClose').innerHTML = I.close;
   $('#sortSel').value = prefs.sort;
   $('#rateSel').value = String(prefs.rate);
-  if (!canSpeak()) $('#btnTts').hidden = true;
+  if (!canSpeak()) { $('#btnTts').hidden = true; $('#btnTtsSet').hidden = true; }
 
   // 書架
   $('#btnImport').onclick = () => $('#fileInput').click();
@@ -1610,6 +1611,8 @@ function wire() {
   $('#btnToc').onclick = () => openPanel('#toc');
   $('#btnAa').onclick = () => { if ($('#aaSheet').hidden) openPanel('#aaSheet'); else closePanels(); };
   $('#btnTts').onclick = () => { if ($('#player').hidden) openPlayer(); else ttsToggle(); };
+  // 朗讀設定鈕：叫出播放面板並展開設定（不自動開始念）；已經開著就收起
+  $('#btnTtsSet').onclick = () => { if (!$('#player').hidden && !$('#pOpts').hidden) hidePlayer(); else showPlayerSettings(); };
   $('#scrim').onclick = closePanels;
   $('#btnPrev').onclick = () => goChapter(R.ch - 1);
   $('#btnNext').onclick = () => goChapter(R.ch + 1);
@@ -1619,9 +1622,8 @@ function wire() {
     const sel = window.getSelection && String(window.getSelection());
     if (sel) return;
     const blk = e.target.closest('[data-b]');
-    // 面板開著時點段落＝從那段開始念；面板收著時點一下＝叫出播放面板與設定（不自動開始念）
-    if (!$('#player').hidden) { if (blk) ttsStart(+blk.dataset.b); return; }
-    if (canSpeak()) showPlayerSettings();
+    // 面板開著時點段落＝從那段開始念
+    if (!$('#player').hidden && blk) ttsStart(+blk.dataset.b);
   });
   window.addEventListener('scroll', onScroll, { passive: true });
 

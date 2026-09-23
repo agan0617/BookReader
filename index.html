@@ -60,6 +60,7 @@ svg{display:block}
 .icon{width:44px;height:44px;flex:none;display:grid;place-items:center;border-radius:10px;border:0;background:transparent}
 .icon:hover{background:var(--surface)}
 .icon svg{width:22px;height:22px}
+.icon.on{color:var(--accent);background:var(--accent-soft)}
 .icon.aa{font-family:var(--f-display);font-weight:600;font-size:18px;letter-spacing:-.02em}
 
 /* ───── 書架 ───── */
@@ -339,7 +340,7 @@ body.player-open .toast{bottom:calc(150px + env(safe-area-inset-bottom,0px))}
       <button class="icon" type="button" id="pNext" aria-label="下一段"></button>
       <div class="p-status"><b id="pTitle"></b><span id="pSub"></span></div>
       <button class="icon" type="button" id="pTune" aria-label="朗讀設定" aria-expanded="false"></button>
-      <button class="icon" type="button" id="pClose" aria-label="結束朗讀"></button>
+      <button class="icon" type="button" id="pClose" aria-label="收起朗讀面板（朗讀會繼續）" title="收起面板，朗讀會繼續；按上方耳機再打開"></button>
     </div>
     <div class="p-opts" id="pOpts" hidden>
       <label>速度
@@ -522,6 +523,7 @@ K書吧會自動找章節，不用自己設定：
 點右上角的**耳機**，會從畫面上的段落開始念。念到哪一段會標出來並自動捲動，章尾接著念下一章。
 
 - 朗讀時**點任何一段**，就從那一段開始念。
+- 播放面板右邊的 **✕** 只是把面板收起來，朗讀會繼續；上方的耳機會亮著，點它再把面板叫出來。要停就按暫停。
 - 可以調**速度**、**音量**、換**語音**，這些設定每台裝置各自記住，下次打開還在。iPhone／iPad 的 Safari 不理會網頁設的朗讀音量，要用手機的音量鍵調。用的是瀏覽器或系統內建的語音，Windows 上建議選名稱有「Chinese (Traditional, Taiwan)」的那個。
 - **定時停止**：15 到 60 分鐘，或念完這一章就停，適合睡前聽。選過的時間會記住，下次開始朗讀時自動套用。
 - 朗讀時會盡量讓螢幕保持亮著；手機鎖定螢幕後，有些手機會停止朗讀。
@@ -1375,6 +1377,10 @@ function ttsToggle() {
 function ttsStop() {
   if (!synth) return;
   ttsPause(); clearSpeaking(); setSleep('0');
+  hidePlayer();
+}
+// 只收起播放面板，朗讀照常；按上方耳機再叫出來
+function hidePlayer() {
   $('#player').hidden = true; $('#reader').classList.remove('with-player'); document.body.classList.remove('player-open');
 }
 function ttsJump(delta) {
@@ -1397,6 +1403,8 @@ function updatePlayer() {
   const btn = $('#pPlay');
   btn.innerHTML = T.playing ? I.pause : I.play;
   btn.setAttribute('aria-label', T.playing ? '暫停' : '播放');
+  $('#btnTts').classList.toggle('on', T.playing);
+  $('#btnTts').setAttribute('aria-label', T.playing ? '朗讀中，打開朗讀面板' : '朗讀');
   $('#pTitle').textContent = (R.chapters[R.ch] && R.chapters[R.ch].title) || '';
   let sub = R.blocks.length ? `第 ${Math.min(T.b + 1, R.blocks.length)} / ${R.blocks.length} 段` : '';
   if (T.sleepAt) { const m = Math.max(0, Math.ceil((T.sleepAt - Date.now()) / 60000)); sub += ` · ${m} 分鐘後停止`; }
@@ -1486,7 +1494,7 @@ function wire() {
   $('#pPlay').onclick = ttsToggle;
   $('#pPrev').onclick = () => ttsJump(-1);
   $('#pNext').onclick = () => ttsJump(1);
-  $('#pClose').onclick = ttsStop;
+  $('#pClose').onclick = hidePlayer;
   $('#pTune').onclick = () => { const o = $('#pOpts'); o.hidden = !o.hidden; $('#pTune').setAttribute('aria-expanded', String(!o.hidden)); };
   $('#rateSel').onchange = e => { prefs.rate = +e.target.value; savePrefs(); if (T.playing) restartSpeech(); };
   $('#voiceSel').onchange = e => { prefs.voice = e.target.value; savePrefs(); if (T.playing) restartSpeech(); };
@@ -1505,7 +1513,7 @@ function wire() {
     if (e.key === 'Escape') {
       if (!$('#modal').hidden) { closeModal(); return; }
       if (panelOpen()) { closePanels(); return; }
-      if (R.view === 'reader' && !$('#player').hidden) { ttsStop(); return; }
+      if (R.view === 'reader' && !$('#player').hidden) { hidePlayer(); return; }
       if (R.view === 'reader') { $('#btnBack').click(); }
       return;
     }

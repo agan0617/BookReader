@@ -1,8 +1,8 @@
-# K書吧 BookReader
+# K書吧 KBookBar
 
 讀 AI 寫的書用的閱讀器，整個程式就是一個 `index.html`，用 GitHub Pages 發佈：
 
-**https://agan0617.github.io/BookReader/**
+**https://agan0617.github.io/KBookBar/**
 
 - 書架資料（書目、書檔、閱讀進度）**不在這個 repo**，而在使用者自己的**私有 repo**（作者的是 `agan0617/BookShelf`）
 - 頁面用 GitHub REST API 讀寫那個 repo，需要的 token 由使用者在每台裝置貼一次，只存在那台裝置的 `localStorage`
@@ -31,7 +31,7 @@
 
 ### 3. 讓K書吧連上你的 repo
 
-1. 打開 https://agan0617.github.io/BookReader/
+1. 打開 https://agan0617.github.io/KBookBar/
 2. 按右上角的連線狀態（或書架上的「連上書架」）
 3. 貼上 token
 4. 展開「**換 repo（一般不用動）**」，把 `agan0617/BookShelf` 改成 **`你的帳號/你的 repo 名`**
@@ -59,7 +59,7 @@
 1. **Fork** 這個 repo
 2. fork 的 Settings → **Pages** → Source 選 Deploy from a branch，Branch 選 `main`／`(root)` → Save
 3. 把 `index.html` 裡的 `GH_DEFAULT` 改成你的書架 repo（`{ owner: '你的帳號', repo: '你的 repo 名', … }`），之後每台裝置就只要貼 token、不用再換 repo
-4. 用 `https://你的帳號.github.io/BookReader/` 打開
+4. 用 `https://你的帳號.github.io/KBookBar/` 打開
 
 ## 功能
 

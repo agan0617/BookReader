@@ -1463,7 +1463,7 @@ function showPlayer() {
 }
 function showPlayerSettings() {
   showPlayer();
-  if (NATIVE ? !$('#voiceSel').options.length : !T.voices.length) loadVoices();
+  if (NATIVE || !T.voices.length) loadVoices();
   $('#pOpts').hidden = false; $('#pTune').setAttribute('aria-expanded', 'true');
   if (!T.playing) { T.b = currentBlock(); T.s = 0; T.chunks = null; }
   updatePlayer();
@@ -1472,14 +1472,14 @@ function showPlayerSettings() {
 function ttsQuickToggle() {
   if (!canSpeak()) { toast('這個瀏覽器不支援朗讀'); return; }
   if (T.playing) { ttsPause(); clearSpeaking(); return; }
-  if (NATIVE ? !$('#voiceSel').options.length : !T.voices.length) loadVoices();
+  if (NATIVE || !T.voices.length) loadVoices();
   if (!T.sleepAt && !T.stopAtChEnd && prefs.sleep && prefs.sleep !== '0') setSleep(prefs.sleep);
   ttsStart(currentBlock());
 }
 function openPlayer() {
   if (!canSpeak()) { toast('這個瀏覽器不支援朗讀'); return; }
   showPlayer();
-  if (NATIVE ? !$('#voiceSel').options.length : !T.voices.length) loadVoices();
+  if (NATIVE || !T.voices.length) loadVoices();
   if (!T.sleepAt && !T.stopAtChEnd && prefs.sleep && prefs.sleep !== '0') setSleep(prefs.sleep);
   if (!T.playing) ttsStart(currentBlock());
 }
@@ -1693,7 +1693,7 @@ function wire() {
     if (blk && canSpeak()) {
       if ($('#player').hidden && !T.playing) {
         showPlayer();
-        if (NATIVE ? !$('#voiceSel').options.length : !T.voices.length) loadVoices();
+        if (NATIVE || !T.voices.length) loadVoices();
         if (!T.sleepAt && !T.stopAtChEnd && prefs.sleep && prefs.sleep !== '0') setSleep(prefs.sleep);
       }
       ttsStart(+blk.dataset.b);

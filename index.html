@@ -86,6 +86,11 @@ button.chip:hover{border-color:var(--faint)}
 .continue-card p{margin:0 0 9px;color:var(--muted);font-size:13.5px;display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical;overflow:hidden}
 .continue-card .go{width:40px;height:40px;border-radius:50%;display:grid;place-items:center;background:var(--accent);color:var(--accent-ink)}
 .continue-card .go svg{width:20px;height:20px}
+.dev-list{display:grid;gap:6px;margin-top:8px}
+.dev-row{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:10px;width:100%;padding:10px 14px;text-align:left;background:var(--surface);border:1px solid var(--line);border-radius:10px;font-size:13.5px;color:var(--muted);font-variant-numeric:tabular-nums}
+.dev-row:hover{border-color:var(--faint)}
+.dev-row b{color:var(--ink);font-weight:600;white-space:nowrap}
+.dev-row .t{overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
 .bar{height:3px;border-radius:2px;background:var(--line);overflow:hidden}
 .bar i{display:block;height:100%;background:var(--accent);border-radius:2px}
 
@@ -472,7 +477,9 @@ K書吧讀的是純文字書檔：**.md**（Markdown）或 **.txt**。叫 AI 寫
 
 書在兩個地方各有一份：**每台裝置的瀏覽器裡**一份，**你的私有 GitHub repo** BookShelf 一份。每次打開K書吧，會先擺出這台裝置上的書，再跟 GitHub 比對：有新書就下載、改版就更新、別台裝置刪掉的就移除。所以沒網路也能讀已經下載的書，打開也比較快。
 
-閱讀進度也存在 GitHub，手機和電腦共用同一份。換章、回書架、離開頁面時會同步，讀同一章很久時最多每 3 分鐘存一次。
+閱讀進度也存在 GitHub，而且**每台裝置分開記**（電腦、手機瀏覽器、手機 App 各一份），不會互相蓋掉。換章、回書架、離開頁面時會同步，讀同一章很久時最多每 3 分鐘存一次。
+
+書架上方的「繼續閱讀」會打開最近讀的位置；如果別台裝置讀到的地方不一樣，底下會列出每台裝置讀到哪，點哪一個就從那裡繼續。直接點書架上的封面，則是從這台裝置自己讀到的地方開始。
 
 ## 在新裝置上連上書架
 每台裝置（手機、電腦各自的瀏覽器）第一次打開K書吧時，要貼一次 GitHub token：
@@ -845,18 +852,56 @@ const GH = {
     textCache.set(book.id, t); Store.set('text:' + book.id, { text: t, ver: book.updatedAt });
     return t;
   },
+  // 進度分裝置記：o[id].devs[裝置 id] 各自一份，外層的 ch/b/pct/t/at 是各裝置裡最新的那份（給舊程式與 bot 列書架用）
   saveProgress(id, p, keepalive) {
     const title = (S.books.find(b => b.id === id) || {}).title || id;
-    return this.mutate('prog', o => { if (o[id] && (o[id].at || 0) > p.at) return null; o[id] = p; return o; }, `進度：《${title}》第 ${p.ch + 1} 章`, keepalive);
+    return this.mutate('prog', o => {
+      const e = (o[id] && typeof o[id] === 'object') ? o[id] : {};
+      const devs = Object.assign({}, e.devs);
+      const mine = devs[DEV.id];
+      if (mine && (mine.at || 0) > p.at) return null;
+      // 改版前留下的單一進度：比這次新才保留成一筆「先前紀錄」，免得別台讀到的位置不見
+      if (!e.devs && e.at && e.at > p.at) devs.legacy = { ch: e.ch, b: e.b, pct: e.pct, t: e.t, at: e.at, name: '先前紀錄' };
+      devs[DEV.id] = Object.assign({}, p, { name: DEV.name });
+      const latest = Object.values(devs).reduce((x, y) => ((y.at || 0) > (x.at || 0) ? y : x));
+      o[id] = { ch: latest.ch, b: latest.b, pct: latest.pct, t: latest.t, at: latest.at, devs };
+      return o;
+    }, `進度：《${title}》第 ${p.ch + 1} 章（${DEV.name}）`, keepalive);
   }
 };
 
 const canWrite = () => S.mode === 'gh';
-function getProgress(id) {
-  const a = S.progress[id], b = LS.get('prog:' + id, null);
+
+/* 裝置：每個瀏覽器／App 各有一個 id，閱讀進度分裝置記，手機和電腦才不會互相蓋掉 */
+const DEV = (() => {
+  let d = LS.get('device', null);
+  if (!d || !d.id) {
+    const name = window.KBookNative ? '手機 App' : /Android|iPhone|iPad|Mobile/i.test(navigator.userAgent) ? '手機瀏覽器' : '電腦';
+    d = { id: 'd' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), name };
+    LS.set('device', d);
+  }
+  return d;
+})();
+function ownProgress(id) {
+  const c = S.progress[id], a = c && c.devs && c.devs[DEV.id], b = LS.get('prog:' + id, null);
   if (!a) return b; if (!b) return a;
   return (a.at || 0) >= (b.at || 0) ? a : b;
 }
+// 各裝置讀到哪（新的在前）；mine＝這台
+function progressByDevice(id) {
+  const c = S.progress[id], out = [];
+  if (c && c.devs) Object.keys(c.devs).forEach(k => { const v = c.devs[k]; if (k !== DEV.id && v && v.at) out.push({ dev: k, name: v.name || '其他裝置', p: v, mine: false }); });
+  else if (c && c.at) out.push({ dev: 'legacy', name: '先前紀錄', p: c, mine: false });
+  const own = ownProgress(id);
+  if (own) out.push({ dev: DEV.id, name: DEV.name, p: own, mine: true });
+  return out.sort((a, b) => (b.p.at || 0) - (a.p.at || 0));
+}
+// 打開書的預設位置：這台自己的優先，這台沒讀過才用其他裝置最新的
+function getProgress(id) {
+  const own = ownProgress(id); if (own) return own;
+  const all = progressByDevice(id); return all.length ? all[0].p : null;
+}
+const newestAt = id => { const all = progressByDevice(id); return all.length ? (all[0].p.at || 0) : 0; };
 const guideBook = () => ({ id: GUIDE_ID, title: 'K書吧使用說明', author: 'K書吧', format: 'md', builtin: true, chars: countChars(GUIDE_MD), chapters: 6, addedAt: 0 });
 
 /* ───────── 書架畫面 ───────── */
@@ -865,7 +910,7 @@ function coverHTML(b, withAuthor = true) {
 }
 function sortedBooks() {
   const list = S.books.slice();
-  const lastAt = b => { const p = getProgress(b.id); return p ? p.at : 0; };
+  const lastAt = b => newestAt(b.id);
   if (prefs.sort === 'title') list.sort((a, b) => a.title.localeCompare(b.title, 'zh-Hant', { numeric: true }));
   else if (prefs.sort === 'added') list.sort((a, b) => (b.addedAt || 0) - (a.addedAt || 0));
   else list.sort((a, b) => (lastAt(b) - lastAt(a)) || ((b.addedAt || 0) - (a.addedAt || 0)));
@@ -878,17 +923,23 @@ function renderLibrary() {
   const writable = canWrite();
   $('#btnImport').hidden = !writable;
 
+  // 繼續閱讀：最近讀的那本；各裝置位置不一樣時，底下列出其他裝置讀到哪，讓 Ken 自己選
   let last = null;
-  books.forEach(b => { const p = getProgress(b.id); if (p && (!last || p.at > last.p.at)) last = { b, p }; });
+  books.forEach(b => { const all = progressByDevice(b.id); if (all.length && (!last || all[0].p.at > last.all[0].p.at)) last = { b, all }; });
   const cont = $('#continue');
   if (last) {
-    const pct = Math.round((last.p.pct || 0) * 100);
-    cont.innerHTML = `<button class="continue-card" type="button" data-open="${esc(last.b.id)}">
+    const [top, ...rest] = last.all;
+    const others = rest.filter(x => x.p.ch !== top.p.ch || x.p.b !== top.p.b);
+    const devLabel = x => esc(x.name) + (x.mine ? '（這台）' : '');
+    const pct = Math.round((top.p.pct || 0) * 100);
+    cont.innerHTML = `<button class="continue-card" type="button" data-open="${esc(last.b.id)}" data-dev="${esc(top.dev)}">
       ${coverHTML(last.b, false)}
-      <div style="min-width:0"><span class="eyebrow">繼續閱讀</span><h2>${esc(last.b.title)}</h2>
-      <p>第 ${last.p.ch + 1} 章${last.p.t ? ' · ' + esc(last.p.t) : ''} · 已讀 ${pct}% · ${fmtAgo(last.p.at)}</p>
+      <div style="min-width:0"><span class="eyebrow">繼續閱讀${others.length ? ' · ' + devLabel(top) : ''}</span><h2>${esc(last.b.title)}</h2>
+      <p>第 ${top.p.ch + 1} 章${top.p.t ? ' · ' + esc(top.p.t) : ''} · 已讀 ${pct}% · ${fmtAgo(top.p.at)}</p>
       <div class="bar"><i style="width:${pct}%"></i></div></div>
-      <span class="go">${I.arrow}</span></button>`;
+      <span class="go">${I.arrow}</span></button>` +
+      (others.length ? `<div class="dev-list">${others.map(x => `<button class="dev-row" type="button" data-open="${esc(last.b.id)}" data-dev="${esc(x.dev)}">
+        <b>${devLabel(x)}</b><span class="t">第 ${x.p.ch + 1} 章${x.p.t ? ' · ' + esc(x.p.t) : ''}</span><span>${Math.round((x.p.pct || 0) * 100)}% · ${fmtAgo(x.p.at)}</span></button>`).join('')}</div>` : '');
     cont.hidden = false;
   } else cont.hidden = true;
 
@@ -1060,7 +1111,7 @@ function editDialog(book) {
 /* ───────── 閱讀畫面 ───────── */
 const R = { view: 'library', book: null, chapters: [], ch: 0, blocks: [], libScroll: 0 };
 
-async function openBook(id) {
+async function openBook(id, startAt) {
   const book = id === GUIDE_ID ? guideBook() : S.books.find(b => b.id === id);
   if (!book) return;
   R.libScroll = scrollY;
@@ -1085,7 +1136,7 @@ async function openBook(id) {
   }
   if (R.book !== book) return;
   R.chapters = parsed.chapters;
-  const p = getProgress(book.id);
+  const p = startAt || getProgress(book.id);
   const ch = p ? Math.min(Math.max(0, p.ch | 0), R.chapters.length - 1) : 0;
   renderToc();
   openChapter(ch, { block: p && (p.ch | 0) === ch ? (p.b | 0) : 0 });
@@ -1168,7 +1219,7 @@ function savePos() {
   const p = { ch: R.ch, b, pct: Math.min(1, (R.ch + (R.blocks.length ? (b + 1) / R.blocks.length : 1)) / n), t: (R.chapters[R.ch] && R.chapters[R.ch].title) || '', at: Date.now() };
   LS.set('prog:' + R.book.id, p);
   if (R.book.builtin || !canWrite()) return;
-  const saved = S.progress[R.book.id];
+  const cloud = S.progress[R.book.id], saved = cloud && cloud.devs && cloud.devs[DEV.id];
   if (saved && saved.ch === p.ch && saved.b === p.b) { if (pendingCloud && pendingCloud.id === R.book.id) pendingCloud = null; return; }
   const chChanged = !saved || saved.ch !== p.ch;
   pendingCloud = { id: R.book.id, p };
@@ -1218,14 +1269,10 @@ async function afterSync() {
     if (!canWrite()) return;
     const pend = {};
     for (const b of books) {
-      const l = LS.get('prog:' + b.id, null), c = S.progress[b.id];
+      const l = LS.get('prog:' + b.id, null), e = S.progress[b.id], c = e && e.devs && e.devs[DEV.id];
       if (l && (!c || (l.at || 0) > (c.at || 0)) && (!c || l.ch !== c.ch || l.b !== c.b)) pend[b.id] = l;
     }
-    if (Object.keys(pend).length) await GH.mutate('prog', o => {
-      let changed = false;
-      for (const [id, p] of Object.entries(pend)) if (!o[id] || (o[id].at || 0) < p.at) { o[id] = p; changed = true; }
-      return changed ? o : null;
-    }, '進度：補上沒同步到的閱讀進度').catch(() => {});
+    for (const [id, p] of Object.entries(pend)) { try { await GH.saveProgress(id, p); } catch {} }
   } finally { syncRunning = false; S.syncing = ''; updateChip(); }
 }
 function connectDialog() {
@@ -1601,7 +1648,11 @@ function wire() {
     const ed = e.target.closest('[data-edit]');
     if (ed) { const b = S.books.find(x => x.id === ed.dataset.edit); if (b) editDialog(b); return; }
     const op = e.target.closest('[data-open]');
-    if (op) openBook(op.dataset.open);
+    if (op) {
+      // 從「繼續閱讀」點的：照那台裝置的位置開
+      const d = op.dataset.dev, hit = d ? progressByDevice(op.dataset.open).find(x => x.dev === d) : null;
+      openBook(op.dataset.open, hit ? hit.p : null);
+    }
   });
   let dragDepth = 0;
   window.addEventListener('dragenter', e => { if (R.view !== 'library' || !canWrite() || !e.dataTransfer || ![...e.dataTransfer.types].includes('Files')) return; dragDepth++; $('#dropHint').hidden = false; });

@@ -215,6 +215,22 @@ input[type="range"]{width:100%;accent-color:var(--accent)}
 @media (max-width:560px){.p-opts{grid-template-columns:1fr 1fr}.p-opts .voice{grid-column:1/-1;order:-1}}
 .p-hint{margin:8px 0 0;font-size:12px;color:var(--faint)}
 
+/* 朗讀進度列：念的時候常駐在最下方，停了就收。左邊設定鈕、中間這一章的進度（拖到哪段就從哪段念）、右邊音量 */
+:root{--ttsbar-h:calc(60px + env(safe-area-inset-bottom,0px))}
+.ttsbar{--tx:0;position:fixed;left:0;right:0;bottom:0;z-index:32;height:var(--ttsbar-h);padding:8px 10px calc(8px + env(safe-area-inset-bottom,0px));background:var(--raised);border-top:1px solid var(--line);box-shadow:0 -10px 30px -18px rgba(0,0,0,.4);animation:slideU .22s ease}
+.ttsbar-in{max-width:760px;margin-inline:auto;height:44px;display:flex;align-items:center;gap:8px}
+.ttsbar input[type="range"]{margin:0;height:32px;min-width:0}
+.ttsbar .seek{flex:1;min-width:0;display:flex;align-items:center;gap:8px}
+.ttsbar .seek input{flex:1}
+.ttsbar .pos{font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap}
+.ttsbar .vol{flex:none;display:flex;align-items:center;gap:4px;color:var(--muted)}
+.ttsbar .vol svg{width:18px;height:18px}
+.ttsbar .vol input{width:84px}
+@media (max-width:400px){.ttsbar .vol input{width:60px}}
+body.ttsbar-on .player{bottom:var(--ttsbar-h);padding-bottom:10px}
+body.ttsbar-on .rmain{padding-bottom:calc(64px + var(--ttsbar-h))}
+body.ttsbar-on #reader.with-player .rmain{padding-bottom:calc(230px + var(--ttsbar-h))}
+
 /* 對話框、提示 */
 .modal{position:fixed;inset:0;z-index:60;display:grid;place-items:center;padding:16px;background:var(--scrim)}
 .panel{width:min(100%,480px);max-height:calc(100% - 16px);overflow-y:auto;background:var(--raised);border-radius:14px;padding:22px;box-shadow:var(--shadow)}
@@ -228,6 +244,8 @@ input[type="range"]{width:100%;accent-color:var(--accent)}
 .actions .left{margin-right:auto}
 .toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);z-index:70;max-width:calc(100% - 32px);padding:11px 18px;border-radius:999px;background:var(--ink);color:var(--bg);font-size:14px;box-shadow:var(--shadow);text-align:center}
 body.player-open .toast{bottom:calc(150px + env(safe-area-inset-bottom,0px))}
+body.ttsbar-on .toast{bottom:calc(24px + var(--ttsbar-h))}
+body.ttsbar-on.player-open .toast{bottom:calc(150px + var(--ttsbar-h))}
 
 @keyframes slideU{from{transform:translate(var(--tx,0),24px);opacity:0}}
 @keyframes slideL{from{transform:translateX(-24px);opacity:0}}
@@ -270,7 +288,6 @@ body.player-open .toast{bottom:calc(150px + env(safe-area-inset-bottom,0px))}
     <div class="rtitle"><b id="rBook"></b><span id="rChap"></span></div>
     <button class="icon" id="btnToc" type="button" aria-label="目錄"></button>
     <button class="icon aa" id="btnAa" type="button" aria-label="閱讀設定">Aa</button>
-    <button class="icon" id="btnTtsSet" type="button" aria-label="朗讀設定" title="朗讀設定"></button>
     <button class="icon" id="btnTts" type="button" aria-label="朗讀"></button>
   </header>
   <main class="rmain">
@@ -345,7 +362,7 @@ body.player-open .toast{bottom:calc(150px + env(safe-area-inset-bottom,0px))}
       <button class="icon" type="button" id="pNext" aria-label="下一段"></button>
       <div class="p-status"><b id="pTitle"></b><span id="pSub"></span></div>
       <button class="icon" type="button" id="pTune" aria-label="朗讀設定" aria-expanded="false"></button>
-      <button class="icon" type="button" id="pClose" aria-label="收起朗讀面板（朗讀會繼續）" title="收起面板，朗讀會繼續；按耳機左邊的設定鈕再打開"></button>
+      <button class="icon" type="button" id="pClose" aria-label="收起朗讀面板（朗讀會繼續）" title="收起面板，朗讀會繼續；按下方進度列左邊的設定鈕再打開"></button>
     </div>
     <div class="p-opts" id="pOpts" hidden>
       <label>速度
@@ -370,6 +387,17 @@ body.player-open .toast{bottom:calc(150px + env(safe-area-inset-bottom,0px))}
     <p class="p-hint" id="pHint">點任何一段，就從那一段開始念。</p>
   </div>
 </section>
+
+<div class="ttsbar" id="ttsBar" hidden aria-label="朗讀進度">
+  <div class="ttsbar-in">
+    <button class="icon" id="btnTtsSet" type="button" aria-label="朗讀設定" title="朗讀設定"></button>
+    <div class="seek">
+      <input type="range" id="seekRange" min="0" max="0" step="1" value="0" aria-label="這一章的朗讀進度">
+      <span class="pos" id="seekPos"></span>
+    </div>
+    <label class="vol" title="音量"><span id="volIcon"></span><input type="range" id="volRange2" min="0" max="100" step="5" aria-label="朗讀音量"></label>
+  </div>
+</div>
 
 <div class="modal" id="modal" hidden><div class="panel" id="modalPanel" role="dialog" aria-modal="true"></div></div>
 <div class="drop-hint" id="dropHint" hidden>放開就加入書架</div>
@@ -404,7 +432,8 @@ const I = {
   close: SVG('<path d="M6 6l12 12M18 6L6 18"/>'),
   more: SVG('<circle cx="5.5" cy="12" r="1.3" fill="currentColor"/><circle cx="12" cy="12" r="1.3" fill="currentColor"/><circle cx="18.5" cy="12" r="1.3" fill="currentColor"/>'),
   tune: SVG('<path d="M4 7h9M17 7h3M4 17h3M11 17h9"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="17" r="2"/>'),
-  arrow: SVG('<path d="M5 12h14M13 6l6 6-6 6"/>')
+  arrow: SVG('<path d="M5 12h14M13 6l6 6-6 6"/>'),
+  vol: SVG('<path d="M4 9.5v5h3.5L12 18.5v-13L7.5 9.5z" fill="currentColor" stroke="none"/><path d="M15.5 9a4 4 0 010 6M18 6.5a7.5 7.5 0 010 11"/>')
 };
 function fmtChars(n) {
   n = n || 0;
@@ -530,10 +559,10 @@ K書吧會自動找章節，不用自己設定：
 ## 朗讀
 點右上角的**耳機**，會從畫面上的段落開始念；再點一次就停。只有開始／停止，不會跳出任何面板。念到哪一段會標出來並自動捲動，章尾接著念下一章。
 
-耳機左邊的**設定鈕**會叫出下方的播放面板和朗讀設定（速度、語音、定時停止、音量、上一段／下一段），不會馬上開始念，按播放鍵才念；再按一次就收起。
+念的時候最下方會常駐一條**進度列**：中間是這一章的進度，拖到哪一段就從那一段接著念；右邊是音量；最左邊的**設定鈕**會叫出播放面板和朗讀設定（速度、語音、定時停止、上一段／下一段），再按一次就收起。停止朗讀時進度列跟著收起。
 
 - **點任何一段**，就從那一段開始念；還沒在念時會順便叫出播放面板，正在念時只會跳到那一段。
-- 播放面板右邊的 **✕** 只是把面板收起來，朗讀會繼續；上方的耳機會亮著，點它就停，點設定鈕再把面板叫出來。
+- 播放面板右邊的 **✕** 只是把面板收起來，朗讀會繼續；上方的耳機會亮著，點它就停，點進度列左邊的設定鈕再把面板叫出來。
 - 可以調**速度**、**音量**、換**語音**，這些設定每台裝置各自記住，下次打開還在。iPhone／iPad 的 Safari 不理會網頁設的朗讀音量，要用手機的音量鍵調。用的是瀏覽器或系統內建的語音，Windows 上建議選名稱有「Chinese (Traditional, Taiwan)」的那個。
 - **定時停止**：15 到 60 分鐘，或念完這一章就停，適合睡前聽。選過的時間會記住，下次開始朗讀時自動套用。
 - 朗讀會**跳過程式碼區塊**，以及標題叫「參考資料」「參考文獻」「References」這類的整節（到下一個同級標題為止），正文裡的網址和 [4] 這種出處編號也不念；畫面上照樣看得到。
@@ -1369,7 +1398,7 @@ function closePanels() { $('#toc').hidden = true; $('#aaSheet').hidden = true; $
 
 /* ───────── 朗讀（Web Speech API） ───────── */
 const synth = ('speechSynthesis' in window) ? window.speechSynthesis : null;
-const T = { playing: false, b: 0, s: 0, chunks: null, gen: 0, utter: null, errs: 0, sleepTimer: null, sleepAt: 0, stopAtChEnd: false, wake: null, voices: [], tick: null };
+const T = { playing: false, b: 0, s: 0, chunks: null, gen: 0, utter: null, errs: 0, sleepTimer: null, sleepAt: 0, stopAtChEnd: false, wake: null, voices: [], tick: null, seeking: false };
 
 /* 在 Android 的 K書吧 App 裡打開時（有 window.KBookNative），朗讀改由 App 的前景服務念：
    瀏覽器的 speechSynthesis 在 Android 背景會被停掉，App 的不會。網頁把整本書的段落送過去，
@@ -1517,7 +1546,7 @@ function showPlayerSettings() {
   if (!T.playing) { T.b = currentBlock(); T.s = 0; T.chunks = null; }
   updatePlayer();
 }
-// 耳機鈕：只開始／停止朗讀，不叫出面板（2026-09-23 Ken 指定）。面板與設定走耳機左邊的設定鈕。
+// 耳機鈕：只開始／停止朗讀，不叫出面板（2026-09-23 Ken 指定）。面板與設定走下方進度列左邊的設定鈕。
 function ttsQuickToggle() {
   if (!canSpeak()) { toast('這個瀏覽器不支援朗讀'); return; }
   if (T.playing) { ttsPause(); clearSpeaking(); return; }
@@ -1632,7 +1661,7 @@ function ttsStop() {
   ttsPause(); clearSpeaking(); setSleep('0');
   hidePlayer();
 }
-// 只收起播放面板，朗讀照常；按耳機左邊的設定鈕再叫出來
+// 只收起播放面板，朗讀照常；按進度列左邊的設定鈕再叫出來
 function hidePlayer() {
   $('#player').hidden = true; $('#reader').classList.remove('with-player'); document.body.classList.remove('player-open');
 }
@@ -1641,12 +1670,23 @@ function ttsJump(delta) {
   T.b = Math.max(0, Math.min(R.blocks.length - 1, T.b + delta)); T.s = 0; T.chunks = null;
   if (T.playing) restartSpeech(); else { markSpeaking(T.b); updatePlayer(); }
 }
+// 進度列拖到哪一段就從那段念（只在這一章內）
+function ttsSeek(b) {
+  b = Math.max(0, Math.min(R.blocks.length - 1, b | 0));
+  T.b = b; T.s = 0; T.chunks = null;
+  if (NATIVE) { markSpeaking(b); NATIVE.seek(R.ch, b); updatePlayer(); return; }
+  if (T.playing) restartSpeech(); else { markSpeaking(b); updatePlayer(); }
+}
+// 下方被播放面板、進度列佔掉的高度
+function bottomInset() {
+  return ($('#player').hidden ? 0 : $('#player').offsetHeight) + ($('#ttsBar').hidden ? 0 : $('#ttsBar').offsetHeight);
+}
 function markSpeaking(b) {
   const prev = $('#article .speaking'); if (prev) prev.classList.remove('speaking');
   const el = R.blocks[b]; if (!el) return;
   el.classList.add('speaking');
   const r = el.getBoundingClientRect();
-  const bottomLimit = innerHeight - ($('#player').hidden ? 0 : $('#player').offsetHeight) - 20;
+  const bottomLimit = innerHeight - bottomInset() - 20;
   if (r.top < barH() + 10 || r.bottom > bottomLimit) {
     const y = r.top + scrollY - Math.max(barH() + 20, (bottomLimit - r.height) * 0.35);
     window.scrollTo({ top: Math.max(0, y), behavior: reduced ? 'auto' : 'smooth' });
@@ -1666,6 +1706,14 @@ function updatePlayer() {
   else if (T.stopAtChEnd) sub += ' · 念完這章停止';
   if (!T.playing) sub += ' · 已暫停';
   $('#pSub').textContent = sub;
+  // 進度列：只在念的時候顯示；拖拉中不要把把手拉回去
+  const on = T.playing && R.view === 'reader' && R.blocks.length > 0;
+  $('#ttsBar').hidden = !on; document.body.classList.toggle('ttsbar-on', on);
+  if (on && !T.seeking) {
+    const s = $('#seekRange'), cur = Math.min(T.b, R.blocks.length - 1);
+    s.max = R.blocks.length - 1; s.value = cur;
+    $('#seekPos').textContent = `${cur + 1} / ${R.blocks.length}`;
+  }
 }
 function setSleep(v) {
   clearTimeout(T.sleepTimer); clearInterval(T.tick); T.sleepTimer = null; T.sleepAt = 0; T.stopAtChEnd = false;
@@ -1687,13 +1735,14 @@ function releaseWake() { try { if (T.wake) T.wake.release(); } catch {} T.wake =
 
 /* ───────── 事件 ───────── */
 function wire() {
-  $('#btnBack').innerHTML = I.back; $('#btnToc').innerHTML = I.toc; $('#btnTts').innerHTML = I.phones; $('#btnTtsSet').innerHTML = I.tune;
+  $('#btnBack').innerHTML = I.back; $('#btnToc').innerHTML = I.toc; $('#btnTts').innerHTML = I.phones;
+  $('#btnTtsSet').innerHTML = I.tune; $('#volIcon').innerHTML = I.vol;
   $$('[data-close]').forEach(b => { b.innerHTML = I.close; b.addEventListener('click', closePanels); });
   $('#pPrev').innerHTML = I.prev; $('#pNext').innerHTML = I.next; $('#pPlay').innerHTML = I.play;
   $('#pTune').innerHTML = I.tune; $('#pClose').innerHTML = I.close;
   $('#sortSel').value = prefs.sort;
   $('#rateSel').value = String(prefs.rate);
-  if (!canSpeak()) { $('#btnTts').hidden = true; $('#btnTtsSet').hidden = true; }
+  if (!canSpeak()) $('#btnTts').hidden = true;
 
   // 書架
   $('#btnImport').onclick = () => $('#fileInput').click();
@@ -1727,8 +1776,11 @@ function wire() {
   $('#btnToc').onclick = () => openPanel('#toc');
   $('#btnAa').onclick = () => { if ($('#aaSheet').hidden) openPanel('#aaSheet'); else closePanels(); };
   $('#btnTts').onclick = () => { if ($('#player').hidden) ttsQuickToggle(); else ttsToggle(); };
-  // 朗讀設定鈕：叫出播放面板並展開設定（不自動開始念）；已經開著就收起
+  // 進度列左邊的朗讀設定鈕：叫出播放面板並展開設定；已經開著就收起
   $('#btnTtsSet').onclick = () => { if (!$('#player').hidden && !$('#pOpts').hidden) hidePlayer(); else showPlayerSettings(); };
+  // 進度列：拖的時候只更新數字，放開才跳段
+  $('#seekRange').addEventListener('input', e => { T.seeking = true; $('#seekPos').textContent = `${+e.target.value + 1} / ${R.blocks.length}`; });
+  $('#seekRange').addEventListener('change', e => { T.seeking = false; ttsSeek(+e.target.value); });
   $('#scrim').onclick = closePanels;
   $('#btnPrev').onclick = () => goChapter(R.ch - 1);
   $('#btnNext').onclick = () => goChapter(R.ch + 1);
@@ -1769,10 +1821,14 @@ function wire() {
   $('#rateSel').onchange = e => { prefs.rate = +e.target.value; savePrefs(); if (NATIVE) NATIVE.setRate(prefs.rate); else if (T.playing) restartSpeech(); };
   $('#voiceSel').onchange = e => { prefs.voice = e.target.value; savePrefs(); if (NATIVE) NATIVE.setVoice(prefs.voice); else if (T.playing) restartSpeech(); };
   $('#sleepSel').onchange = e => { prefs.sleep = e.target.value; savePrefs(); setSleep(e.target.value); };
-  const showVol = () => { $('#volVal').textContent = Math.round(prefs.volume * 100) + '%'; };
-  $('#volRange').value = Math.round(prefs.volume * 100); showVol();
-  $('#volRange').addEventListener('input', e => { prefs.volume = +e.target.value / 100; showVol(); });
-  $('#volRange').addEventListener('change', () => { savePrefs(); if (NATIVE) NATIVE.setVolume(prefs.volume); else if (T.playing) restartSpeech(); });
+  // 音量拉桿有兩支（播放面板的設定裡、下方進度列右邊），拉哪一支另一支都跟著動
+  const vols = [$('#volRange'), $('#volRange2')];
+  const showVol = () => { const v = Math.round(prefs.volume * 100); $('#volVal').textContent = v + '%'; vols.forEach(r => { if (+r.value !== v) r.value = v; }); };
+  showVol();
+  vols.forEach(r => {
+    r.addEventListener('input', e => { prefs.volume = +e.target.value / 100; showVol(); });
+    r.addEventListener('change', () => { savePrefs(); if (NATIVE) NATIVE.setVolume(prefs.volume); else if (T.playing) restartSpeech(); });
+  });
   if (synth) { synth.cancel(); loadVoices(); if ('onvoiceschanged' in synth) synth.addEventListener('voiceschanged', loadVoices); }
   wireMediaSession();
 

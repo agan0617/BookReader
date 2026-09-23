@@ -1,0 +1,1441 @@
+<!doctype html>
+<html lang="zh-Hant">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-title" content="書匣">
+<meta name="referrer" content="no-referrer">
+<title>書匣</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=LXGW+WenKai+TC:wght@400;700&family=Noto+Sans+TC:wght@400;500;700&family=Noto+Serif+TC:wght@400;600;700&display=swap">
+<style>
+:root{
+  --bg:#EDEFEB; --surface:#F7F8F5; --raised:#FFFFFF; --ink:#1C2126; --muted:#5B6570; --faint:#8A939B; --line:#D6DAD3;
+  --accent:#2D4E7E; --accent-ink:#FFFFFF; --accent-soft:#DAE3F0; --danger:#A5382C; --ok:#3B7F57; --warn:#A87617;
+  --scrim:rgba(12,16,22,.42);
+  --shadow:0 1px 2px rgba(20,28,40,.08),0 10px 28px -14px rgba(20,28,40,.35);
+  --f-display:'Noto Serif TC','Source Han Serif TC','PMingLiU',serif;
+  --f-ui:'Noto Sans TC','Microsoft JhengHei','PingFang TC',system-ui,sans-serif;
+  --f-mono:ui-monospace,'Cascadia Mono',Consolas,monospace;
+  --fs:20px; --lh:1.9; --font:var(--f-display); --measure:38em;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    color-scheme:dark;
+    --bg:#121519; --surface:#171B20; --raised:#1E2329; --ink:#DADFE5; --muted:#96A0AA; --faint:#6C767F; --line:#2B3139;
+    --accent:#94AEDB; --accent-ink:#0D1320; --accent-soft:#223148; --danger:#E27B6E; --ok:#6CC08F; --warn:#E0B055;
+    --scrim:rgba(0,0,0,.55);
+    --shadow:0 1px 2px rgba(0,0,0,.4),0 10px 28px -14px rgba(0,0,0,.7);
+  }
+}
+:root[data-theme="dark"]{
+  color-scheme:dark;
+  --bg:#121519; --surface:#171B20; --raised:#1E2329; --ink:#DADFE5; --muted:#96A0AA; --faint:#6C767F; --line:#2B3139;
+  --accent:#94AEDB; --accent-ink:#0D1320; --accent-soft:#223148; --danger:#E27B6E; --ok:#6CC08F; --warn:#E0B055;
+  --scrim:rgba(0,0,0,.55);
+  --shadow:0 1px 2px rgba(0,0,0,.4),0 10px 28px -14px rgba(0,0,0,.7);
+}
+/* 閱讀底色：只在閱讀畫面生效 */
+body[data-rtheme="paper"]{color-scheme:light;--bg:#FAFAF7;--surface:#F3F3EF;--raised:#FFFFFF;--ink:#23272B;--muted:#686F76;--faint:#9AA0A5;--line:#E2E2DC;--accent:#2D4E7E;--accent-ink:#fff;--accent-soft:#DDE5F1;--scrim:rgba(12,16,22,.4)}
+body[data-rtheme="sepia"]{color-scheme:light;--bg:#F2E8D5;--surface:#EADFC9;--raised:#FAF4E6;--ink:#3A2F22;--muted:#78674F;--faint:#A08F76;--line:#DCCDB0;--accent:#6E4A26;--accent-ink:#FFF8EC;--accent-soft:#E6D5B5;--scrim:rgba(40,28,12,.4)}
+body[data-rtheme="green"]{color-scheme:light;--bg:#D9E7D3;--surface:#CFDFC8;--raised:#E8F1E3;--ink:#22301F;--muted:#55644E;--faint:#7F8E77;--line:#BFD1B6;--accent:#2E5B3A;--accent-ink:#F2FAEE;--accent-soft:#C3D9BA;--scrim:rgba(15,30,15,.4)}
+body[data-rtheme="night"]{color-scheme:dark;--bg:#0F1113;--surface:#15181B;--raised:#1B1F23;--ink:#B7BEC6;--muted:#7C858E;--faint:#5A626A;--line:#252A30;--accent:#8EA6CF;--accent-ink:#0B1018;--accent-soft:#1E2A3D;--scrim:rgba(0,0,0,.6)}
+
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--f-ui);font-size:15px;line-height:1.55;-webkit-tap-highlight-color:transparent;min-height:100%}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:6px}
+svg{display:block}
+
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:40px;padding:0 14px;border-radius:9px;border:1px solid var(--line);background:var(--raised);font-weight:500;font-size:14px;white-space:nowrap}
+.btn:hover{border-color:var(--faint)}
+.btn.primary{background:var(--accent);color:var(--accent-ink);border-color:transparent}
+.btn.primary:hover{filter:brightness(1.08)}
+.btn.danger{color:var(--danger)}
+.btn:disabled{opacity:.4;cursor:default}
+.btn svg{width:18px;height:18px}
+.icon{width:44px;height:44px;flex:none;display:grid;place-items:center;border-radius:10px;border:0;background:transparent}
+.icon:hover{background:var(--surface)}
+.icon svg{width:22px;height:22px}
+.icon.aa{font-family:var(--f-display);font-weight:600;font-size:18px;letter-spacing:-.02em}
+
+/* ───── 書架 ───── */
+.wrap{max-width:1080px;margin-inline:auto;padding-inline:16px}
+@media (min-width:700px){.wrap{padding-inline:28px}}
+.lib-head{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:14px 20px;padding-block:28px 6px}
+.wordmark{margin:0;font-family:var(--f-display);font-weight:700;font-size:clamp(32px,6vw,44px);letter-spacing:.12em;line-height:1}
+.lib-sub{margin:10px 0 0;color:var(--muted);font-size:13.5px;font-variant-numeric:tabular-nums}
+.lib-actions{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+.chip{display:inline-flex;align-items:center;gap:7px;height:30px;padding:0 11px;border-radius:999px;background:var(--surface);border:1px solid var(--line);font-size:12.5px;color:var(--muted)}
+.chip i{width:7px;height:7px;border-radius:50%;background:var(--faint)}
+button.chip:hover{border-color:var(--faint)}
+.chip[data-mode="gh"] i{background:var(--ok)}
+.chip[data-mode="readonly"] i,.chip[data-mode="setup"] i{background:var(--warn)}
+.chip[data-mode="error"] i{background:var(--danger)}
+
+.continue{margin-top:22px}
+.continue-card{display:grid;grid-template-columns:62px 1fr auto;align-items:center;gap:16px;width:100%;padding:14px 16px;text-align:left;background:var(--raised);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow)}
+.continue-card:hover{border-color:var(--faint)}
+.continue-card .cover{width:62px}
+.eyebrow{display:block;font-size:11.5px;letter-spacing:.14em;color:var(--accent);font-weight:500}
+.continue-card h2{margin:4px 0 2px;font-family:var(--f-display);font-size:19px;font-weight:600;text-wrap:balance}
+.continue-card p{margin:0 0 9px;color:var(--muted);font-size:13.5px;display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical;overflow:hidden}
+.continue-card .go{width:40px;height:40px;border-radius:50%;display:grid;place-items:center;background:var(--accent);color:var(--accent-ink)}
+.continue-card .go svg{width:20px;height:20px}
+.bar{height:3px;border-radius:2px;background:var(--line);overflow:hidden}
+.bar i{display:block;height:100%;background:var(--accent);border-radius:2px}
+
+.shelf-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:30px 0 16px}
+.shelf-head h2{margin:0;font-family:var(--f-display);font-size:17px;font-weight:600;letter-spacing:.18em}
+select{height:36px;padding:0 10px;border-radius:8px;border:1px solid var(--line);background:var(--raised);font-size:13.5px;max-width:100%}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(112px,1fr));gap:30px 18px;padding-bottom:64px}
+@media (min-width:700px){.grid{grid-template-columns:repeat(auto-fill,minmax(142px,1fr));gap:34px 26px}}
+.book{display:flex;flex-direction:column;gap:10px;min-width:0}
+.cover-btn{padding:0;border:0;background:none;border-radius:4px}
+.cover{--c:#2D4E7E;--thread:rgba(242,236,222,.8);position:relative;aspect-ratio:2/3;width:100%;max-width:100%;border-radius:2px 5px 5px 2px;container-type:inline-size;overflow:hidden;
+  background:
+    linear-gradient(90deg,rgba(0,0,0,.24) 0 8%,rgba(255,255,255,.09) 8% 8.8%,transparent 8.8%),
+    repeating-linear-gradient(135deg,rgba(255,255,255,.028) 0 2px,transparent 2px 5px),
+    var(--c);
+  box-shadow:0 1px 1px rgba(0,0,0,.2),0 12px 20px -12px rgba(0,0,0,.55);transition:transform .2s ease}
+.cover::before{content:"";position:absolute;left:0;width:8%;top:9%;height:84%;background:linear-gradient(to bottom,var(--thread) 0 1.5px,transparent 1.5px) 0 0/100% 25%}
+.cover-btn:hover .cover{transform:translateY(-3px)}
+.slip{position:absolute;top:7%;right:11%;width:28%;max-height:64%;padding:7cqw 0;background:#F3EEE2;color:#24211D;
+  box-shadow:inset 0 0 0 2.5cqw #F3EEE2,inset 0 0 0 calc(2.5cqw + 1px) rgba(36,33,29,.4);
+  writing-mode:vertical-rl;font-family:var(--f-display);font-weight:600;font-size:10.5cqw;line-height:1.15;letter-spacing:.06em;overflow:hidden;display:flex;align-items:center}
+.cover .auth{position:absolute;left:17%;bottom:7%;writing-mode:vertical-rl;font-family:var(--f-display);font-size:7cqw;letter-spacing:.1em;color:rgba(255,255,255,.72);max-height:40%;overflow:hidden}
+.cover .tag{position:absolute;left:17%;top:7%;font-size:7cqw;letter-spacing:.2em;color:rgba(255,255,255,.72);writing-mode:vertical-rl}
+.book-title{margin:0;font-family:var(--f-display);font-weight:600;font-size:15px;line-height:1.35;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;text-wrap:balance}
+.book-meta{display:flex;align-items:center;justify-content:space-between;gap:6px;color:var(--muted);font-size:12.5px;font-variant-numeric:tabular-nums;margin-top:-4px}
+.book-meta .more{width:30px;height:30px;margin-right:-6px;border-radius:8px}
+.book-meta .more svg{width:18px;height:18px}
+.book .pct{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--faint);font-variant-numeric:tabular-nums}
+.book .pct .bar{flex:1}
+.book .last{margin-top:-4px;font-size:12px;color:var(--faint);font-variant-numeric:tabular-nums}
+.empty{grid-column:1/-1;margin:0;padding:22px;border:1.5px dashed var(--line);border-radius:12px;color:var(--muted);text-align:center;line-height:1.8}
+.drop-hint{position:fixed;inset:12px;z-index:80;border:2px dashed var(--accent);border-radius:16px;background:color-mix(in srgb,var(--bg) 88%,transparent);display:grid;place-items:center;font-family:var(--f-display);font-size:22px;color:var(--accent);pointer-events:none}
+
+/* ───── 閱讀 ───── */
+.rbar{position:fixed;top:0;left:0;right:0;z-index:20;display:flex;align-items:center;gap:2px;padding:calc(env(safe-area-inset-top,0px) + 6px) 8px 6px;background:color-mix(in srgb,var(--bg) 93%,transparent);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border-bottom:1px solid var(--line);transition:transform .25s ease}
+.bars-hidden .rbar{transform:translateY(-110%)}
+.rtitle{flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;text-align:center;padding-inline:6px;line-height:1.3}
+.rtitle b,.rtitle span{max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rtitle b{font-family:var(--f-display);font-weight:600;font-size:14.5px}
+.rtitle span{font-size:12px;color:var(--muted)}
+.rprog{position:fixed;top:0;left:0;right:0;height:2px;z-index:21;pointer-events:none}
+.rprog i{display:block;height:100%;width:0;background:var(--accent);opacity:.8}
+.rmain{padding-top:calc(76px + env(safe-area-inset-top,0px));padding-bottom:64px;padding-inline:20px}
+@media (min-width:700px){.rmain{padding-inline:40px}}
+#reader.with-player .rmain{padding-bottom:230px}
+.article{max-width:var(--measure);margin-inline:auto;font-family:var(--font);font-size:var(--fs);line-height:var(--lh);letter-spacing:.02em;text-align:justify;overflow-wrap:break-word}
+.article p{margin:0 0 .85em}
+.indent .article p{text-indent:2em}
+.article li p,.article blockquote p{text-indent:0}
+.article h1,.article h2,.article h3,.article h4{font-family:var(--font);line-height:1.45;text-wrap:balance;text-align:left;letter-spacing:.05em;margin:1.6em 0 .8em}
+.article h1{font-size:1.5em}
+.article h2{font-size:1.32em}
+.article h3{font-size:1.14em}
+.article > h1:first-child,.article > h2:first-child,.article > h3:first-child{text-align:center;margin:.8em 0 1.8em;font-size:1.42em;font-weight:700}
+.article > h1:first-child::after,.article > h2:first-child::after,.article > h3:first-child::after{content:"";display:block;width:2.2em;height:1px;margin:.9em auto 0;background:var(--faint)}
+.article blockquote{margin:1em 0;padding:.1em 0 .1em 1em;border-left:3px solid var(--line);color:var(--muted)}
+.article ul,.article ol{padding-left:1.6em;margin:0 0 .85em}
+.article li{margin:.2em 0}
+.article hr{border:0;margin:2em 0;text-align:center;height:auto}
+.article hr::after{content:"＊　＊　＊";color:var(--faint);font-size:.9em}
+.article pre{overflow-x:auto;font-family:var(--f-mono);font-size:.78em;line-height:1.6;background:var(--surface);border:1px solid var(--line);padding:.8em 1em;border-radius:8px;text-align:left;white-space:pre}
+.article code{font-family:var(--f-mono);font-size:.85em;background:var(--surface);padding:.1em .3em;border-radius:4px}
+.article pre code{background:none;padding:0;font-size:1em}
+.article img{max-width:100%;height:auto}
+.article table{display:block;overflow-x:auto;border-collapse:collapse;font-size:.9em;margin:1em 0}
+.article td,.article th{border:1px solid var(--line);padding:.35em .6em}
+.article a{color:var(--accent)}
+.article .speaking{background:var(--accent-soft);box-shadow:0 0 0 .28em var(--accent-soft);border-radius:3px}
+.article .loading,.article .err{text-align:center;color:var(--muted);text-indent:0;margin-top:30vh}
+.chnav{max-width:var(--measure);margin:3.2em auto 0;padding-top:1.4em;border-top:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:13.5px;color:var(--muted);font-variant-numeric:tabular-nums}
+
+/* 目錄抽屜 */
+.scrim{position:fixed;inset:0;z-index:35;background:var(--scrim)}
+.drawer{position:fixed;top:0;bottom:0;left:0;z-index:40;width:min(88vw,380px);display:flex;flex-direction:column;background:var(--raised);box-shadow:var(--shadow);padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);animation:slideL .22s ease}
+.drawer-head{display:flex;align-items:center;gap:10px;padding:14px 8px 12px 20px;border-bottom:1px solid var(--line)}
+.drawer-head b{font-family:var(--f-display);font-size:17px;letter-spacing:.15em}
+.drawer-head span{flex:1;color:var(--muted);font-size:12.5px}
+.toc{list-style:none;margin:0;padding:6px 0 20px;overflow-y:auto;flex:1}
+.toc button{display:flex;gap:12px;width:100%;padding:11px 20px;border:0;background:none;text-align:left;font-size:14.5px;line-height:1.45}
+.toc button:hover{background:var(--surface)}
+.toc .n{flex:none;width:2.4em;color:var(--faint);font-variant-numeric:tabular-nums;text-align:right}
+.toc .cur button{color:var(--accent);font-weight:600;background:var(--accent-soft)}
+.toc .cur .n{color:var(--accent)}
+
+/* 設定面板 */
+.sheet{position:fixed;left:50%;bottom:0;transform:translateX(-50%);z-index:40;width:min(100%,520px);max-height:85vh;overflow-y:auto;background:var(--raised);border-radius:16px 16px 0 0;padding:8px 20px calc(18px + env(safe-area-inset-bottom,0px));box-shadow:var(--shadow);animation:slideU .22s ease}
+@media (min-width:900px){.sheet{left:auto;right:20px;top:72px;bottom:auto;transform:none;width:380px;border-radius:14px;animation:none}}
+.sheet-head{display:flex;align-items:center;justify-content:space-between;padding:6px 0 4px}
+.sheet-head b{font-family:var(--f-display);font-size:16px;letter-spacing:.12em}
+.row{display:grid;grid-template-columns:4.2em 1fr;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--line)}
+.row:last-child{border-bottom:0}
+.row > label,.row > span{font-size:13px;color:var(--muted)}
+.fs-ctl{display:grid;grid-template-columns:auto 1fr auto auto;align-items:center;gap:10px}
+.fs-ctl .btn{min-height:36px;padding:0 10px;font-family:var(--f-display)}
+.fs-val{min-width:2.4em;text-align:right;font-variant-numeric:tabular-nums;font-size:13px;color:var(--muted)}
+input[type="range"]{width:100%;accent-color:var(--accent)}
+.seg{display:flex;border:1px solid var(--line);border-radius:9px;overflow:hidden}
+.seg button{flex:1;min-height:38px;border:0;background:transparent;font-size:14px}
+.seg button + button{border-left:1px solid var(--line)}
+.seg button[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink)}
+.swatches{display:flex;flex-wrap:wrap;gap:10px}
+.sw{display:flex;flex-direction:column;align-items:center;gap:4px;border:0;background:none;padding:0;font-size:11.5px;color:var(--muted)}
+.sw i{width:36px;height:36px;border-radius:50%;border:1px solid rgba(0,0,0,.18);display:block}
+.sw[aria-pressed="true"] i{box-shadow:0 0 0 2px var(--raised),0 0 0 4px var(--accent)}
+.sw[aria-pressed="true"]{color:var(--ink)}
+.switch{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:14px}
+.switch input{width:20px;height:20px;accent-color:var(--accent)}
+
+/* 朗讀播放列 */
+.player{position:fixed;left:0;right:0;bottom:0;z-index:30;background:var(--raised);border-top:1px solid var(--line);box-shadow:0 -10px 30px -18px rgba(0,0,0,.4);padding:10px 16px calc(10px + env(safe-area-inset-bottom,0px));animation:slideU .22s ease}
+.player-in{max-width:760px;margin-inline:auto}
+.p-row{display:flex;align-items:center;gap:6px}
+.p-play{width:52px;height:52px;border-radius:50%;border:0;background:var(--accent);color:var(--accent-ink);display:grid;place-items:center;flex:none}
+.p-play svg{width:24px;height:24px}
+.p-status{flex:1;min-width:0;padding-inline:8px;line-height:1.35}
+.p-status b{display:block;font-family:var(--f-display);font-weight:600;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.p-status span{font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
+.p-opts{display:grid;grid-template-columns:1fr 2fr 1fr;gap:10px;padding-top:10px;margin-top:10px;border-top:1px solid var(--line)}
+.p-opts label{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--muted);min-width:0}
+.p-opts select{width:100%}
+@media (max-width:560px){.p-opts{grid-template-columns:1fr 1fr}.p-opts .voice{grid-column:1/-1;order:-1}}
+.p-hint{margin:8px 0 0;font-size:12px;color:var(--faint)}
+
+/* 對話框、提示 */
+.modal{position:fixed;inset:0;z-index:60;display:grid;place-items:center;padding:16px;background:var(--scrim)}
+.panel{width:min(100%,480px);max-height:calc(100% - 16px);overflow-y:auto;background:var(--raised);border-radius:14px;padding:22px;box-shadow:var(--shadow)}
+.panel h3{margin:0 0 6px;font-family:var(--f-display);font-size:19px;font-weight:600;text-wrap:balance}
+.panel .m-body{margin:6px 0 0;color:var(--muted);line-height:1.7}
+.panel label{display:block;margin:14px 0 6px;font-size:13px;color:var(--muted)}
+.panel input[type="text"],.panel input[type="password"],.panel textarea{width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:9px;background:var(--surface);font-size:15px}
+.panel textarea{min-height:min(42vh,340px);resize:vertical;line-height:1.6}
+.panel .hint{margin:8px 0 0;font-size:12.5px;color:var(--faint);line-height:1.6}
+.actions{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:8px;margin-top:20px}
+.actions .left{margin-right:auto}
+.toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);z-index:70;max-width:calc(100% - 32px);padding:11px 18px;border-radius:999px;background:var(--ink);color:var(--bg);font-size:14px;box-shadow:var(--shadow);text-align:center}
+body.player-open .toast{bottom:calc(150px + env(safe-area-inset-bottom,0px))}
+
+@keyframes slideU{from{transform:translate(var(--tx,0),24px);opacity:0}}
+@keyframes slideL{from{transform:translateX(-24px);opacity:0}}
+.sheet{--tx:-50%}
+@media (min-width:900px){.sheet{--tx:0}}
+.player{--tx:0}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+
+<div id="library">
+  <header class="lib-head wrap">
+    <div>
+      <h1 class="wordmark">書匣</h1>
+      <p class="lib-sub" id="libSub">正在打開書架…</p>
+    </div>
+    <div class="lib-actions">
+      <button class="chip" id="syncChip" type="button" data-mode="init"><i></i><span>連線中</span></button>
+      <button class="btn primary" id="btnImport" type="button">匯入檔案</button>
+      <input type="file" id="fileInput" multiple accept=".md,.markdown,.txt,.text,text/plain,text/markdown" hidden>
+    </div>
+  </header>
+  <main class="wrap">
+    <section class="continue" id="continue" hidden></section>
+    <div class="shelf-head">
+      <h2>書架</h2>
+      <select id="sortSel" aria-label="排序">
+        <option value="recent">最近閱讀</option>
+        <option value="added">加入時間</option>
+        <option value="title">書名</option>
+      </select>
+    </div>
+    <div class="grid" id="grid"></div>
+  </main>
+</div>
+
+<div id="reader" hidden>
+  <div class="rprog"><i id="rprogBar"></i></div>
+  <header class="rbar" id="rbar">
+    <button class="icon" id="btnBack" type="button" aria-label="回書架"></button>
+    <div class="rtitle"><b id="rBook"></b><span id="rChap"></span></div>
+    <button class="icon" id="btnToc" type="button" aria-label="目錄"></button>
+    <button class="icon aa" id="btnAa" type="button" aria-label="閱讀設定">Aa</button>
+    <button class="icon" id="btnTts" type="button" aria-label="朗讀"></button>
+  </header>
+  <main class="rmain">
+    <article class="article" id="article" lang="zh-Hant"></article>
+    <nav class="chnav">
+      <button class="btn" id="btnPrev" type="button">上一章</button>
+      <span id="chPos"></span>
+      <button class="btn primary" id="btnNext" type="button">下一章</button>
+    </nav>
+  </main>
+</div>
+
+<div class="scrim" id="scrim" hidden></div>
+
+<aside class="drawer" id="toc" hidden aria-label="目錄">
+  <div class="drawer-head"><b>目錄</b><span id="tocMeta"></span><button class="icon" type="button" data-close aria-label="關閉目錄"></button></div>
+  <ol class="toc" id="tocList"></ol>
+</aside>
+
+<section class="sheet" id="aaSheet" hidden aria-label="閱讀設定">
+  <div class="sheet-head"><b>閱讀設定</b><button class="icon" type="button" data-close aria-label="關閉設定"></button></div>
+  <div class="row">
+    <span>字級</span>
+    <div class="fs-ctl">
+      <button class="btn" type="button" id="fsDown" aria-label="字小一點">A−</button>
+      <input type="range" id="fsRange" min="14" max="34" step="1" aria-label="字級">
+      <button class="btn" type="button" id="fsUp" aria-label="字大一點">A+</button>
+      <span class="fs-val" id="fsVal"></span>
+    </div>
+  </div>
+  <div class="row">
+    <label for="lhRange">行高</label>
+    <input type="range" id="lhRange" min="1.4" max="2.6" step="0.1">
+  </div>
+  <div class="row">
+    <span>字體</span>
+    <div class="seg" id="fontSeg">
+      <button type="button" data-v="serif" style="font-family:var(--f-display)">明體</button>
+      <button type="button" data-v="sans" style="font-family:var(--f-ui)">黑體</button>
+      <button type="button" data-v="kai" style="font-family:'LXGW WenKai TC','DFKai-SB',serif">楷體</button>
+    </div>
+  </div>
+  <div class="row">
+    <span>底色</span>
+    <div class="swatches" id="themeSw">
+      <button class="sw" type="button" data-v="auto"><i style="background:linear-gradient(135deg,#F4F4F0 50%,#16191D 50%)"></i>系統</button>
+      <button class="sw" type="button" data-v="paper"><i style="background:#FAFAF7"></i>白</button>
+      <button class="sw" type="button" data-v="sepia"><i style="background:#F2E8D5"></i>米</button>
+      <button class="sw" type="button" data-v="green"><i style="background:#D9E7D3"></i>綠</button>
+      <button class="sw" type="button" data-v="night"><i style="background:#0F1113"></i>夜</button>
+    </div>
+  </div>
+  <div class="row">
+    <span>版寬</span>
+    <div class="seg" id="widthSeg">
+      <button type="button" data-v="s">窄</button>
+      <button type="button" data-v="m">中</button>
+      <button type="button" data-v="l">寬</button>
+    </div>
+  </div>
+  <div class="row">
+    <span>段落</span>
+    <label class="switch" for="indentChk">首行縮排兩字<input type="checkbox" id="indentChk"></label>
+  </div>
+</section>
+
+<section class="player" id="player" hidden aria-label="朗讀">
+  <div class="player-in">
+    <div class="p-row">
+      <button class="icon" type="button" id="pPrev" aria-label="上一段"></button>
+      <button class="p-play" type="button" id="pPlay" aria-label="播放"></button>
+      <button class="icon" type="button" id="pNext" aria-label="下一段"></button>
+      <div class="p-status"><b id="pTitle"></b><span id="pSub"></span></div>
+      <button class="icon" type="button" id="pTune" aria-label="朗讀設定" aria-expanded="false"></button>
+      <button class="icon" type="button" id="pClose" aria-label="結束朗讀"></button>
+    </div>
+    <div class="p-opts" id="pOpts" hidden>
+      <label>速度
+        <select id="rateSel">
+          <option value="0.75">0.75×</option><option value="0.9">0.9×</option><option value="1">1×</option>
+          <option value="1.15">1.15×</option><option value="1.3">1.3×</option><option value="1.5">1.5×</option>
+          <option value="1.75">1.75×</option><option value="2">2×</option>
+        </select>
+      </label>
+      <label class="voice">語音<select id="voiceSel"></select></label>
+      <label>定時停止
+        <select id="sleepSel">
+          <option value="0">不設定</option><option value="15">15 分鐘</option><option value="30">30 分鐘</option>
+          <option value="45">45 分鐘</option><option value="60">60 分鐘</option><option value="ch">念完這章</option>
+        </select>
+      </label>
+    </div>
+    <p class="p-hint" id="pHint">點任何一段，就從那一段開始念。</p>
+  </div>
+</section>
+
+<div class="modal" id="modal" hidden><div class="panel" id="modalPanel" role="dialog" aria-modal="true"></div></div>
+<div class="drop-hint" id="dropHint" hidden>放開就加入書架</div>
+<div class="toast" id="toast" role="status" hidden></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.2/marked.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.1.6/purify.min.js"></script>
+<script>
+(() => {
+'use strict';
+
+/* ───────── 小工具 ───────── */
+const $ = (s, r = document) => r.querySelector(s);
+const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const LS = {
+  get(k, d) { try { const v = localStorage.getItem('shuxia:' + k); return v == null ? d : JSON.parse(v); } catch { return d; } },
+  set(k, v) { try { localStorage.setItem('shuxia:' + k, JSON.stringify(v)); } catch {} },
+  del(k) { try { localStorage.removeItem('shuxia:' + k); } catch {} }
+};
+const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const coarse = matchMedia('(pointer: coarse)').matches;
+const SVG = p => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${p}</svg>`;
+const I = {
+  back: SVG('<path d="M15 5l-7 7 7 7"/>'),
+  toc: SVG('<path d="M9 6h11M9 12h11M9 18h11"/><path d="M4.5 6h.01M4.5 12h.01M4.5 18h.01" stroke-width="2.6"/>'),
+  phones: SVG('<path d="M4 15.5V12a8 8 0 0116 0v3.5"/><rect x="3" y="14" width="5" height="7" rx="1.8"/><rect x="16" y="14" width="5" height="7" rx="1.8"/>'),
+  play: SVG('<path d="M8 5.2v13.6L19 12z" fill="currentColor" stroke="none"/>'),
+  pause: SVG('<rect x="6.5" y="5" width="3.8" height="14" rx="1" fill="currentColor" stroke="none"/><rect x="13.7" y="5" width="3.8" height="14" rx="1" fill="currentColor" stroke="none"/>'),
+  prev: SVG('<path d="M6 5.5v13"/><path d="M18.5 6L9.5 12l9 6z" fill="currentColor"/>'),
+  next: SVG('<path d="M18 5.5v13"/><path d="M5.5 6l9 6-9 6z" fill="currentColor"/>'),
+  close: SVG('<path d="M6 6l12 12M18 6L6 18"/>'),
+  more: SVG('<circle cx="5.5" cy="12" r="1.3" fill="currentColor"/><circle cx="12" cy="12" r="1.3" fill="currentColor"/><circle cx="18.5" cy="12" r="1.3" fill="currentColor"/>'),
+  tune: SVG('<path d="M4 7h9M17 7h3M4 17h3M11 17h9"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="17" r="2"/>'),
+  arrow: SVG('<path d="M5 12h14M13 6l6 6-6 6"/>')
+};
+function fmtChars(n) {
+  n = n || 0;
+  if (n >= 10000) return (n / 10000).toFixed(n >= 100000 ? 0 : 1).replace(/\.0$/, '') + ' 萬字';
+  return n.toLocaleString('zh-TW') + ' 字';
+}
+function fmtAgo(t) {
+  if (!t) return '';
+  const m = Math.floor((Date.now() - t) / 60000);
+  if (m < 1) return '剛剛';
+  if (m < 60) return `${m} 分鐘前`;
+  if (m < 60 * 24) return `${Math.floor(m / 60)} 小時前`;
+  const now = new Date(), then = new Date(t);
+  const days = Math.round((new Date(now.getFullYear(), now.getMonth(), now.getDate()) - new Date(then.getFullYear(), then.getMonth(), then.getDate())) / 86400000);
+  if (days <= 1) return '昨天';
+  if (days < 7) return `${days} 天前`;
+  return (then.getFullYear() === now.getFullYear() ? '' : then.getFullYear() + '/') + `${then.getMonth() + 1}/${then.getDate()}`;
+}
+function hash(s) { let h = 2166136261; for (const c of String(s)) { h ^= c.codePointAt(0); h = Math.imul(h, 16777619); } return h >>> 0; }
+const COVERS = ['#2D4E7E', '#7B2F2F', '#2E5A45', '#8A6A2B', '#474D61', '#5D3A5D', '#2F5D66', '#6A4E38'];
+const coverColor = b => b.builtin ? '#3A3F46' : COVERS[hash(b.title) % COVERS.length];
+const countChars = t => String(t).replace(/[\s#*_>`\-=|~]/g, '').length;
+let toastTimer = null;
+function toast(msg, ms = 2800) {
+  const t = $('#toast'); t.textContent = msg; t.hidden = false;
+  clearTimeout(toastTimer);
+  if (ms) toastTimer = setTimeout(() => { t.hidden = true; }, ms);
+}
+function errMsg(e) {
+  const code = e && e.code;
+  const map = {
+    too_large: '檔案太大了（上限 20MB）',
+    quota_or_state: '書架空間滿了，刪掉幾本再試',
+    quota_exceeded: '書架空間滿了，刪掉幾本再試',
+    rate_limited: '操作太頻繁，稍等一下再試',
+    not_granted: '這個檢視沒有寫入權限',
+    invalid_request: '檔案編碼讀不懂，請另存成 UTF-8 再匯入',
+    unsupported_type: '只收 .md 或 .txt 純文字檔',
+    gh_401: 'GitHub token 無效或已過期，請重貼一次',
+    gh_403: 'token 沒有這個權限（Contents 要 Read and write），或 GitHub 暫時限流',
+    gh_404: '找不到 BookShelf repo，或 token 沒有授權這個 repo',
+    gh_409: '書架剛被別台裝置改過，重新整理後再試',
+    gh_net: '連不上 GitHub，檢查一下網路'
+  };
+  return map[code] || ('沒有成功：' + ((e && (e.message || e.code)) || e));
+}
+
+/* ───────── 偏好（各裝置各自記） ───────── */
+const FONTS = {
+  serif: "'Noto Serif TC','Source Han Serif TC','PMingLiU',serif",
+  sans: "'Noto Sans TC','Microsoft JhengHei','PingFang TC',sans-serif",
+  kai: "'LXGW WenKai TC','DFKai-SB','BiauKai','KaiTi',serif"
+};
+const WIDTHS = { s: '30em', m: '38em', l: '48em' };
+const storedPrefs = LS.get('prefs', null);
+const prefs = Object.assign({ fs: matchMedia('(max-width: 600px)').matches ? 19 : 21, lh: 1.9, font: 'serif', theme: 'auto', width: 'm', indent: true, rate: 1, voice: '', sort: 'recent' }, storedPrefs || {});
+const savePrefs = () => LS.set('prefs', prefs);
+
+/* ───────── 內建說明書 ───────── */
+const GUIDE_ID = '__guide';
+const GUIDE_MD = `# 書匣使用說明
+作者：書匣
+
+## 把書放上書架
+書匣讀的是純文字書檔：**.md**（Markdown）或 **.txt**。叫 AI 寫好的書，存成其中一種就能放進來。
+
+- **匯入檔案**：右上角「匯入檔案」，一次可以選好幾個。選了多個檔案時，會問你要「各自成書」，還是「依檔名順序合併成一本」——AI 常常一章一個檔，合併後每個檔就是一章。
+- **拖進視窗**：電腦上直接把檔案拖到書架上。
+- **同名的書**：再匯入一次同書名的檔案，可以選「取代舊版」，閱讀進度會保留。書改版重寫時用這個。
+- 也可以直接請 Claude 把寫好的書放上書架。
+
+書和閱讀進度存在你的私有 GitHub repo（BookShelf）：手機和電腦連上同一個 repo，看到的就是同一個書架、同一個閱讀進度。進度在換章、回書架、離開頁面時同步，讀同一章的途中每幾分鐘也會存一次。
+
+## 在新裝置上連上書架
+每台裝置（手機、電腦各自的瀏覽器）第一次打開書匣時，要貼一次 GitHub token：
+
+1. 到 GitHub 的 Settings → Developer settings → Personal access tokens → **Fine-grained tokens**，按 Generate new token。
+2. **Repository access** 選 Only select repositories，只勾 **BookShelf**。
+3. **Permissions** 裡的 **Contents** 設成 **Read and write**，其他都不用開。
+4. 產生後複製 token，回書匣按右上角的連線狀態，貼上後按「連線」。
+
+token 只存在那台裝置的瀏覽器裡，不會送到 GitHub 以外的地方。token 過期或換手機時，照上面的步驟重貼一次。手機弄丟時，到 GitHub 把那個 token 刪掉就好。
+
+## 章節怎麼切
+書匣會自動找章節，不用自己設定：
+
+1. Markdown：取最高一層、出現兩次以上的標題當章節。常見寫法是一個「# 書名」，底下每章一個「## 第一章 章名」。
+2. 純文字：獨立成一行的「第一章」「第十二回」「序章」「楔子」「後記」「番外」「Chapter 3」都會被認成章節標題。
+3. 兩種都找不到時，每八千字左右自動分成一節。
+
+書名和作者：Markdown 的「# 書名」會當書名，開頭一行「作者：某某」會當作者。都沒有就用檔名，之後可以按書下方的「⋯」修改。
+
+## 給 AI 的格式
+請 AI 寫書時，把下面這段加在要求後面，匯入時章節就會切得剛好：
+
+~~~
+請用 Markdown 輸出整本書：
+第一行寫「# 書名」，第二行寫「作者：○○」。
+每一章用「## 第一章 章名」開頭。
+段落之間空一行，不要用表格。
+~~~
+
+## 閱讀設定
+閱讀時點右上角的 **Aa**：
+
+- **字級**：14 到 34 級，用拉桿或 A− / A+ 調整。
+- **行高**、**版寬**、**首行縮排**。
+- **字體**：明體、黑體、楷體。
+- **底色**：跟隨系統、白、米、綠、夜。
+
+設定存在各自的裝置上：手機可以用大字、電腦用小字，互不影響。
+
+電腦上的快捷鍵：← → 換章，+ − 調字級，P 朗讀或暫停，T 開目錄，Esc 關閉面板。
+
+手機上點一下內文可以收起或叫出上方工具列；往下捲時工具列會自動收起。
+
+## 朗讀
+點右上角的**耳機**，會從畫面上的段落開始念。念到哪一段會標出來並自動捲動，章尾接著念下一章。
+
+- 朗讀時**點任何一段**，就從那一段開始念。
+- 可以調**速度**、換**語音**。用的是瀏覽器或系統內建的語音，Windows 上建議選名稱有「Chinese (Traditional, Taiwan)」的那個。
+- **定時停止**：15 到 60 分鐘，或念完這一章就停，適合睡前聽。
+- 朗讀時會盡量讓螢幕保持亮著；手機鎖定螢幕後，有些手機會停止朗讀。
+
+---
+
+這本說明是書匣內建的，不佔書架空間，也刪不掉。
+`;
+
+/* ───────── 解析書檔 → 章節 ───────── */
+const CH_RE = /^(第\s*[0-9０-９一二三四五六七八九十百千萬零〇两兩]+\s*[章回節节卷集部篇幕話话]|(序章|序言|序幕|序|楔子|引子|引言|前言|自序|尾聲|尾声|後記|后记|終章|终章|番外|外傳|外传|附錄|附录)(?=$|[\s：:　·、，,（(「『\-—])|(chapter|part)\s+[0-9ivxlc]+\b|prologue\b|epilogue\b)/i;
+const isChapterLine = l => l.length > 0 && l.length <= 40 && CH_RE.test(l);
+const stripMd = s => String(s).replace(/\[([^\]]*)\]\([^)]*\)/g, '$1').replace(/[*_`~]/g, '').trim();
+const AUTHOR_RE = /^(?:作者|著者|作|文|by)\s*[:：]\s*(.+)$/i;
+const hasMarked = () => typeof window.marked !== 'undefined' && typeof window.marked.lexer === 'function';
+if (hasMarked()) { try { marked.use({ gfm: true, breaks: true }); } catch {} }
+
+function parseBook(text, format) {
+  text = String(text).replace(/^﻿/, '').replace(/\r\n?/g, '\n');
+  const meta = {};
+  const fm = text.match(/^---\n([\s\S]*?)\n---\n/);
+  if (fm) {
+    fm[1].split('\n').forEach(l => {
+      const m = l.match(/^\s*([A-Za-z]+)\s*:\s*(.*)$/);
+      if (m) meta[m[1].toLowerCase()] = m[2].trim().replace(/^["']|["']$/g, '');
+    });
+    text = text.slice(fm[0].length);
+  }
+  let chapters = (format === 'md' && hasMarked()) ? parseMd(text, meta) : parseTxt(text, meta, format === 'md');
+  if (!chapters.length) chapters = [{ title: '（空白）', render: () => '<p>這本書沒有內容。</p>' }];
+  return { meta, chapters };
+}
+
+function mdChapter(title, toks, links) {
+  return { title, render() { const a = toks.slice(); a.links = links; return marked.parser(a); } };
+}
+
+function parseMd(text, meta) {
+  let tokens = marked.lexer(text);
+  const counts = {};
+  tokens.forEach(t => { if (t.type === 'heading') counts[t.depth] = (counts[t.depth] || 0) + 1; });
+  let level = [1, 2, 3, 4].find(d => (counts[d] || 0) >= 2);
+  if (!level) {
+    let n = 0;
+    const conv = text.split('\n').map(l => { const s = l.trim(); if (!/^#/.test(s) && isChapterLine(s)) { n++; return '## ' + s; } return l; });
+    if (n >= 2) { tokens = marked.lexer(conv.join('\n')); level = 2; }
+  }
+  const links = tokens.links || {};
+  const h1 = tokens.find(t => t.type === 'heading' && t.depth === 1);
+  if (!meta.title && h1 && level !== 1) meta.title = stripMd(h1.text);
+  if (!level) {
+    const total = tokens.reduce((s, t) => s + (t.raw || '').length, 0);
+    const body = tokens.filter(t => !(t === h1 && meta.title));
+    if (total < 12000) return [mdChapter(meta.title || '全文', body, links)];
+    const out = []; let cur = [], len = 0;
+    for (const t of body) { cur.push(t); len += (t.raw || '').length; if (len >= 8000 && t.type !== 'heading') { out.push(cur); cur = []; len = 0; } }
+    if (cur.length) out.push(cur);
+    return out.map((toks, i) => mdChapter(`第 ${i + 1} 節`, toks, links));
+  }
+  const chapters = []; const pre = []; let cur = null;
+  for (const t of tokens) {
+    if (t.type === 'heading' && t.depth === level) { cur = { title: stripMd(t.text), toks: [t] }; chapters.push(cur); }
+    else if (cur) cur.toks.push(t);
+    else pre.push(t);
+  }
+  const rest = [];
+  for (const t of pre) {
+    if (t.type === 'space' || (t === h1 && level !== 1)) continue;
+    if (t.type === 'paragraph' && t.text.length < 60) {
+      const m = t.text.trim().match(AUTHOR_RE);
+      if (m) { if (!meta.author) meta.author = stripMd(m[1]); continue; }
+    }
+    rest.push(t);
+  }
+  if (rest.some(t => t.type !== 'hr')) chapters.unshift({ title: '卷首', toks: rest });
+  return chapters.map(c => mdChapter(c.title, c.toks, links));
+}
+
+function parseTxt(text, meta, isMd) {
+  const chs = []; let cur = { title: null, paras: [] };
+  for (const raw of text.split('\n')) {
+    let s = raw.trim(); if (!s) continue;
+    let isH = false;
+    if (isMd) {
+      const m = s.match(/^(#{1,6})\s+(.*)$/);
+      if (m) {
+        if (m[1].length === 1 && !meta.title && !chs.length && !cur.paras.length) { meta.title = stripMd(m[2]); continue; }
+        s = stripMd(m[2]); isH = true;
+      }
+    }
+    if (isH || isChapterLine(s)) { if (cur.title !== null || cur.paras.length) chs.push(cur); cur = { title: s, paras: [] }; }
+    else cur.paras.push(isMd ? stripMd(s) : s);
+  }
+  if (cur.title !== null || cur.paras.length) chs.push(cur);
+  if (chs.length > 1 && chs[0].title === null) {
+    const p = chs[0].paras;
+    if (p.length <= 3 && p.every(x => x.length < 40)) {
+      p.forEach((x, i) => {
+        const m = x.match(AUTHOR_RE);
+        if (m) { if (!meta.author) meta.author = m[1].trim(); }
+        else if (i === 0 && !meta.title) meta.title = x;
+      });
+      chs.shift();
+    } else chs[0].title = '卷首';
+  }
+  let list = chs;
+  if (chs.length === 1 && chs[0].title === null) {
+    const paras = chs[0].paras;
+    const total = paras.reduce((s, x) => s + x.length, 0);
+    if (total < 12000) list = [{ title: meta.title || '全文', paras }];
+    else {
+      list = []; let buf = [], len = 0;
+      for (const x of paras) { buf.push(x); len += x.length; if (len >= 8000) { list.push({ title: `第 ${list.length + 1} 節`, paras: buf }); buf = []; len = 0; } }
+      if (buf.length) list.push({ title: `第 ${list.length + 1} 節`, paras: buf });
+    }
+  }
+  return list.map(c => ({ title: c.title, render: () => `<h2>${esc(c.title)}</h2>` + c.paras.map(p => `<p>${esc(p)}</p>`).join('') }));
+}
+
+function sanitize(html) {
+  if (window.DOMPurify && DOMPurify.sanitize) return DOMPurify.sanitize(html);
+  const tpl = document.createElement('template'); tpl.innerHTML = html;
+  tpl.content.querySelectorAll('script,iframe,object,embed,style,link,meta,form').forEach(n => n.remove());
+  tpl.content.querySelectorAll('*').forEach(el => [...el.attributes].forEach(a => {
+    if (/^on/i.test(a.name) || (/^(href|src)$/i.test(a.name) && /^\s*javascript:/i.test(a.value))) el.removeAttribute(a.name);
+  }));
+  return tpl.innerHTML;
+}
+
+/* ───────── 儲存：私有 GitHub repo（library.json 書目、books/ 書檔、progress.json 進度） ─────────
+   token 由使用者在每台裝置貼一次，只存在這台裝置的 localStorage。 */
+const S = { mode: 'init', backend: null, books: [], progress: {}, loaded: false, err: '' };
+const textCache = new Map();
+const parsedCache = new Map();
+function emit() { if (R.view === 'library') renderLibrary(); }
+
+const GH_DEFAULT = { owner: 'agan0617', repo: 'BookShelf', branch: '', token: '' };
+const ghConf = () => Object.assign({}, GH_DEFAULT, LS.get('gh', {}));
+const b64enc = s => { const u = new TextEncoder().encode(s); let bin = ''; for (let i = 0; i < u.length; i += 0x8000) bin += String.fromCharCode.apply(null, u.subarray(i, i + 0x8000)); return btoa(bin); };
+const b64dec = s => new TextDecoder().decode(Uint8Array.from(atob(String(s).replace(/\s/g, '')), c => c.charCodeAt(0)));
+const encPath = p => p.split('/').map(encodeURIComponent).join('/');
+const newId = () => 'b' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+const bookFile = (id, format) => `books/${id}.${format === 'txt' ? 'txt' : 'md'}`;
+class GhError extends Error { constructor(status, msg) { super(msg); this.status = status; this.code = status ? 'gh_' + status : 'gh_net'; } }
+
+const GH = {
+  conf: null, lib: { books: [] }, libSha: null, prog: {}, progSha: null,
+  async api(path, opt = {}) {
+    const c = this.conf;
+    const headers = { Authorization: 'Bearer ' + c.token, Accept: 'application/vnd.github+json' };
+    if (opt.body) headers['Content-Type'] = 'application/json';
+    Object.assign(headers, opt.headers || {});
+    let r;
+    try { r = await fetch(`https://api.github.com/repos/${c.owner}/${c.repo}${path ? '/' + path : ''}`, Object.assign({ cache: 'no-store' }, opt, { headers })); }
+    catch (e) { throw new GhError(0, e.message); }
+    if (!r.ok) { let m = ''; try { m = (await r.json()).message || ''; } catch {} throw new GhError(r.status, m || 'HTTP ' + r.status); }
+    return r;
+  },
+  ref() { return 'ref=' + encodeURIComponent(this.conf.branch); },
+  async getJson(path) {
+    try {
+      const j = await (await this.api(`contents/${encPath(path)}?${this.ref()}`)).json();
+      return { data: JSON.parse(b64dec(j.content)), sha: j.sha };
+    } catch (e) { if (e.status === 404) return null; throw e; }
+  },
+  async sha(path) {
+    try { return (await (await this.api(`contents/${encPath(path)}?${this.ref()}`)).json()).sha; }
+    catch (e) { if (e.status === 404) return null; throw e; }
+  },
+  async put(path, text, sha, message, keepalive) {
+    const body = { message, content: b64enc(text), branch: this.conf.branch };
+    if (sha) body.sha = sha;
+    const r = await this.api(`contents/${encPath(path)}`, { method: 'PUT', body: JSON.stringify(body), keepalive: !!keepalive });
+    return (await r.json()).content.sha;
+  },
+  async del(path, message) {
+    const sha = await this.sha(path); if (!sha) return;
+    await this.api(`contents/${encPath(path)}`, { method: 'DELETE', body: JSON.stringify({ message, sha, branch: this.conf.branch }) });
+  },
+  setLocal(kind, data, sha) {
+    if (kind === 'lib') { this.lib = data; this.libSha = sha; S.books = data.books.map(b => Object.assign({}, b)); }
+    else { this.prog = data; this.progSha = sha; S.progress = Object.assign({}, data); }
+    emit();
+  },
+  async refresh(kind) {
+    const kinds = kind ? [kind] : ['lib', 'prog'];
+    const got = await Promise.all(kinds.map(k => this.getJson(k === 'lib' ? 'library.json' : 'progress.json')));
+    kinds.forEach((k, i) => {
+      const x = got[i], d = x && x.data;
+      if (k === 'lib') this.setLocal('lib', d && Array.isArray(d.books) ? d : { books: [] }, x ? x.sha : null);
+      else this.setLocal('prog', d && typeof d === 'object' && !Array.isArray(d) ? d : {}, x ? x.sha : null);
+    });
+  },
+  // 讀最新版 → 套用 fn → 寫回；別台裝置同時改過（sha 對不上）就重讀再套一次
+  async mutate(kind, fn, message, keepalive) {
+    const path = kind === 'lib' ? 'library.json' : 'progress.json';
+    for (let tries = 0; ; tries++) {
+      const cur = JSON.parse(JSON.stringify(kind === 'lib' ? this.lib : this.prog));
+      const next = fn(cur);
+      if (next === null) return;
+      try {
+        const sha = await this.put(path, JSON.stringify(next, null, 2) + '\n', kind === 'lib' ? this.libSha : this.progSha, message, keepalive);
+        this.setLocal(kind, next, sha); return;
+      } catch (e) {
+        if ((e.status === 409 || e.status === 422) && tries < 3) { await this.refresh(kind); continue; }
+        throw e;
+      }
+    }
+  },
+  async init(conf) {
+    this.conf = conf;
+    const repo = await (await this.api('')).json();
+    if (!this.conf.branch) this.conf.branch = repo.default_branch || 'main';
+    await this.refresh();
+    return !(repo.permissions && repo.permissions.push === false);
+  },
+  async add(meta, text) {
+    const id = newId(), file = bookFile(id, meta.format), now = Date.now();
+    await this.put(file, text, null, `上架《${meta.title}》`);
+    await this.mutate('lib', lib => { lib.books.push(Object.assign({ id }, meta, { file, addedAt: now, updatedAt: now })); return lib; }, `書目：加入《${meta.title}》`);
+    textCache.set(id, text);
+    return id;
+  },
+  async replace(book, meta, text) {
+    const file = bookFile(book.id, meta.format);
+    await this.put(file, text, await this.sha(file), `改版《${meta.title}》`);
+    if (book.file && book.file !== file) await this.del(book.file, `移除舊檔《${book.title}》`).catch(() => {});
+    await this.mutate('lib', lib => { const b = lib.books.find(x => x.id === book.id); if (!b) return null; Object.assign(b, meta, { file, updatedAt: Date.now() }); return lib; }, `書目：改版《${meta.title}》`);
+    textCache.set(book.id, text); parsedCache.delete(book.id);
+  },
+  async update(id, patch) {
+    await this.mutate('lib', lib => { const b = lib.books.find(x => x.id === id); if (!b) return null; Object.assign(b, patch, { updatedAt: Date.now() }); return lib; }, `書目：修改《${patch.title || id}》`);
+  },
+  async remove(book) {
+    await this.mutate('lib', lib => { lib.books = lib.books.filter(x => x.id !== book.id); return lib; }, `下架《${book.title}》`);
+    this.mutate('prog', o => { if (!(book.id in o)) return null; delete o[book.id]; return o; }, `進度：移除《${book.title}》`).catch(() => {});
+    if (book.file) this.del(book.file, `刪除書檔《${book.title}》`).catch(() => {});
+    textCache.delete(book.id); parsedCache.delete(book.id); LS.del('prog:' + book.id);
+  },
+  async text(book) {
+    if (textCache.has(book.id)) return textCache.get(book.id);
+    const r = await this.api(`contents/${encPath(book.file || bookFile(book.id, book.format))}?${this.ref()}`, { headers: { Accept: 'application/vnd.github.raw+json' } });
+    const t = await r.text(); textCache.set(book.id, t); return t;
+  },
+  saveProgress(id, p, keepalive) {
+    const title = (S.books.find(b => b.id === id) || {}).title || id;
+    return this.mutate('prog', o => { if (o[id] && (o[id].at || 0) > p.at) return null; o[id] = p; return o; }, `進度：《${title}》第 ${p.ch + 1} 章`, keepalive);
+  }
+};
+
+const canWrite = () => S.mode === 'gh';
+function getProgress(id) {
+  const a = S.progress[id], b = LS.get('prog:' + id, null);
+  if (!a) return b; if (!b) return a;
+  return (a.at || 0) >= (b.at || 0) ? a : b;
+}
+const guideBook = () => ({ id: GUIDE_ID, title: '書匣使用說明', author: '書匣', format: 'md', builtin: true, chars: countChars(GUIDE_MD), chapters: 6, addedAt: 0 });
+
+/* ───────── 書架畫面 ───────── */
+function coverHTML(b, withAuthor = true) {
+  return `<div class="cover" style="--c:${coverColor(b)}">${b.builtin ? '<span class="tag">說明</span>' : ''}<div class="slip">${esc(b.title)}</div>${withAuthor && b.author && !b.builtin ? `<span class="auth">${esc(b.author)}</span>` : ''}</div>`;
+}
+function sortedBooks() {
+  const list = S.books.slice();
+  const lastAt = b => { const p = getProgress(b.id); return p ? p.at : 0; };
+  if (prefs.sort === 'title') list.sort((a, b) => a.title.localeCompare(b.title, 'zh-Hant', { numeric: true }));
+  else if (prefs.sort === 'added') list.sort((a, b) => (b.addedAt || 0) - (a.addedAt || 0));
+  else list.sort((a, b) => (lastAt(b) - lastAt(a)) || ((b.addedAt || 0) - (a.addedAt || 0)));
+  return list;
+}
+function renderLibrary() {
+  const books = S.books;
+  const total = books.reduce((s, b) => s + (b.chars || 0), 0);
+  $('#libSub').textContent = !S.loaded ? '正在打開書架…' : (S.mode === 'setup' || S.mode === 'error') ? '還沒連上書架' : books.length ? `${books.length} 本書 · 共 ${fmtChars(total)}` : '書架還是空的';
+  const writable = canWrite();
+  $('#btnImport').hidden = !writable;
+
+  let last = null;
+  books.forEach(b => { const p = getProgress(b.id); if (p && (!last || p.at > last.p.at)) last = { b, p }; });
+  const cont = $('#continue');
+  if (last) {
+    const pct = Math.round((last.p.pct || 0) * 100);
+    cont.innerHTML = `<button class="continue-card" type="button" data-open="${esc(last.b.id)}">
+      ${coverHTML(last.b, false)}
+      <div style="min-width:0"><span class="eyebrow">繼續閱讀</span><h2>${esc(last.b.title)}</h2>
+      <p>第 ${last.p.ch + 1} 章${last.p.t ? ' · ' + esc(last.p.t) : ''} · 已讀 ${pct}% · ${fmtAgo(last.p.at)}</p>
+      <div class="bar"><i style="width:${pct}%"></i></div></div>
+      <span class="go">${I.arrow}</span></button>`;
+    cont.hidden = false;
+  } else cont.hidden = true;
+
+  const cards = sortedBooks().concat([guideBook()]).map(b => {
+    const p = getProgress(b.id);
+    const pct = p ? Math.round((p.pct || 0) * 100) : 0;
+    const chs = b.chapters || 0;
+    return `<article class="book">
+      <button class="cover-btn" type="button" data-open="${esc(b.id)}" aria-label="閱讀《${esc(b.title)}》">${coverHTML(b)}</button>
+      <div>
+        <h3 class="book-title">${esc(b.title)}</h3>
+      </div>
+      <div class="book-meta"><span>${fmtChars(b.chars)}${chs ? ` · ${chs} 章` : ''}</span>${!b.builtin && writable ? `<button class="icon more" type="button" data-edit="${esc(b.id)}" aria-label="編輯《${esc(b.title)}》">${I.more}</button>` : ''}</div>
+      <div class="pct"><div class="bar"><i style="width:${pct}%"></i></div><span>${p ? (pct >= 100 ? '讀完' : pct + '%') : '未讀'}</span></div>
+      <div class="last"${p && p.at ? ` title="${esc(new Date(p.at).toLocaleString('zh-TW'))}"` : ''}>${p && p.at ? '上次閱讀 ' + fmtAgo(p.at) : '還沒讀過'}</div>
+    </article>`;
+  });
+  let html = cards.join('');
+  if (S.mode === 'setup') {
+    html = `<p class="empty">這台裝置還沒連上 GitHub 書架。第一次使用要貼一次 token，旁邊那本說明〈在新裝置上連上書架〉有步驟。<br><button class="btn primary" type="button" data-connect style="margin-top:12px">連上書架</button></p>` + html;
+  } else if (S.mode === 'error') {
+    html = `<p class="empty">書架讀不到：${esc(S.err)}<br><button class="btn primary" type="button" data-connect style="margin-top:12px">重新連線</button></p>` + html;
+  } else if (S.loaded && !books.length) {
+    html = `<p class="empty">書架上還沒有書。${writable ? '按右上角「匯入檔案」選 AI 寫好的 .md／.txt' + (coarse ? '' : '，也可以把檔案直接拖進這個視窗') + '。' : ''}旁邊那本說明寫了書匣怎麼切章節、怎麼朗讀。</p>` + html;
+  }
+  $('#grid').innerHTML = html;
+}
+function updateChip() {
+  const c = $('#syncChip');
+  const t = { init: '連線中', gh: 'GitHub 同步', readonly: '唯讀', setup: '尚未連線', error: '連線失敗' }[S.mode] || S.mode;
+  const repo = ghConf();
+  const tip = {
+    gh: `書和閱讀進度存在 ${repo.owner}/${repo.repo}，手機和電腦共用。點這裡可以換 token 或中斷連線`,
+    readonly: '這個 token 只能讀，不能新增或修改書',
+    setup: '點這裡貼上 GitHub token',
+    error: S.err
+  }[S.mode] || '';
+  c.dataset.mode = S.mode; c.title = tip; c.lastElementChild.textContent = t;
+}
+
+/* ───────── 匯入 ───────── */
+async function readFileText(f) {
+  const buf = new Uint8Array(await f.arrayBuffer());
+  if (buf[0] === 0xFF && buf[1] === 0xFE) return new TextDecoder('utf-16le').decode(buf);
+  if (buf[0] === 0xFE && buf[1] === 0xFF) return new TextDecoder('utf-16be').decode(buf);
+  try { return new TextDecoder('utf-8', { fatal: true }).decode(buf); } catch {}
+  const cands = ['big5', 'gb18030'].map(enc => {
+    try { const t = new TextDecoder(enc).decode(buf); return { t, bad: (t.match(/\uFFFD/g) || []).length }; } catch { return null; }
+  }).filter(Boolean).sort((a, b) => a.bad - b.bad);
+  return cands.length ? cands[0].t : new TextDecoder().decode(buf);
+}
+const fmtOf = (name, text) => /\.(txt|text)$/i.test(name) ? 'txt' : /\.(md|markdown)$/i.test(name) ? 'md' : (/^#{1,6}\s/m.test(text) ? 'md' : 'txt');
+const baseName = n => n.replace(/\.[^.]+$/, '');
+
+async function importFiles(fileList) {
+  if (!canWrite()) { toast('這個檢視沒有寫入權限'); return; }
+  const files = [...fileList].filter(f => /\.(md|markdown|txt|text)$/i.test(f.name) || /^text\//.test(f.type));
+  if (!files.length) { toast('只收 .md 或 .txt 檔'); return; }
+  const items = [];
+  for (const f of files) { const text = await readFileText(f); items.push({ name: f.name, text, format: fmtOf(f.name, text) }); }
+  items.sort((a, b) => a.name.localeCompare(b.name, 'zh-Hant', { numeric: true }));
+  if (items.length > 1) {
+    const c = await ask({
+      title: `選了 ${items.length} 個檔案`,
+      body: '要各自成為一本書，還是依檔名順序合併成一本？合併時每個檔案是一章。',
+      buttons: [{ key: 'cancel', label: '取消' }, { key: 'sep', label: '各自成書' }, { key: 'merge', label: '合併成一本', kind: 'primary' }]
+    });
+    if (!c || c === 'cancel') return;
+    if (c === 'merge') { const m = mergeItems(items); await addOne(m.text, 'md', m.title); return; }
+  }
+  for (const it of items) await addOne(it.text, it.format, baseName(it.name));
+}
+function mergeItems(items) {
+  const names = items.map(i => baseName(i.name));
+  let prefix = names[0];
+  for (const n of names) { let k = 0; while (k < prefix.length && prefix[k] === n[k]) k++; prefix = prefix.slice(0, k); }
+  prefix = prefix.replace(/[\s_\-—.·第0-9０-９]+$/, '').trim();
+  const title = prefix.length >= 2 ? prefix : names[0] + ' 等';
+  const parts = items.map(it => {
+    let t = it.text.replace(/^﻿/, '').replace(/\r\n?/g, '\n').trim();
+    if (it.format === 'txt') t = t.split('\n').map(l => l.trim()).filter(Boolean).join('\n\n');
+    const lines = t.split('\n');
+    const first = lines[0].trim();
+    const hm = first.match(/^#{1,6}\s+(.*)$/);
+    if (hm) lines[0] = '# ' + hm[1];
+    else if (isChapterLine(first)) lines[0] = '# ' + first;
+    else lines.unshift('# ' + baseName(it.name), '');
+    return lines.join('\n');
+  });
+  return { title, text: `---\ntitle: ${title}\n---\n` + parts.join('\n\n') };
+}
+
+async function addOne(text, format, fallbackTitle, forcedTitle, forcedAuthor) {
+  if (!canWrite()) { toast('這個檢視沒有寫入權限'); return; }
+  if (!String(text).trim()) { toast('內容是空的'); return; }
+  let parsed;
+  try { parsed = parseBook(text, format); } catch (e) { toast('這份檔案解析失敗：' + e.message); return; }
+  const meta = {
+    title: String(forcedTitle || parsed.meta.title || fallbackTitle || '未命名').trim().slice(0, 120),
+    author: String(forcedAuthor || parsed.meta.author || '').trim().slice(0, 80),
+    format, chars: countChars(text), chapters: parsed.chapters.length
+  };
+  const dup = S.books.find(b => b.title === meta.title);
+  let how = 'new';
+  if (dup) {
+    how = await ask({
+      title: `書架上已經有《${meta.title}》`,
+      body: '如果這是改版，可以取代舊檔，閱讀進度會保留；也可以另存成一本新的。',
+      buttons: [{ key: 'cancel', label: '取消' }, { key: 'new', label: '另存一本' }, { key: 'replace', label: '取代舊版', kind: 'primary' }]
+    });
+    if (!how || how === 'cancel') return;
+  }
+  toast(`正在加入《${meta.title}》…`, 0);
+  try {
+    if (how === 'replace') { await S.backend.replace(dup, meta, text); toast(`已更新《${meta.title}》，進度保留`); }
+    else { await S.backend.add(meta, text); toast(`已加入《${meta.title}》· ${meta.chapters} 章`); }
+  } catch (e) { toast(errMsg(e), 5000); }
+}
+
+/* ───────── 對話框 ───────── */
+let modalResolve = null;
+function openModal(html) {
+  const m = $('#modal'), p = $('#modalPanel');
+  p.innerHTML = html; m.hidden = false;
+  const f = p.querySelector('[autofocus]') || p.querySelector('.btn.primary') || p.querySelector('input,textarea,button');
+  setTimeout(() => f && f.focus(), 30);
+  return p;
+}
+function closeModal() {
+  $('#modal').hidden = true; $('#modalPanel').innerHTML = '';
+  const r = modalResolve; modalResolve = null; if (r) r(null);
+}
+function ask({ title, body, buttons }) {
+  return new Promise(res => {
+    const p = openModal(`<h3>${esc(title)}</h3>${body ? `<p class="m-body">${esc(body)}</p>` : ''}
+      <div class="actions">${buttons.map(b => `<button class="btn ${b.kind || ''} ${b.left ? 'left' : ''}" type="button" data-k="${b.key}">${esc(b.label)}</button>`).join('')}</div>`);
+    modalResolve = res;
+    p.querySelectorAll('[data-k]').forEach(btn => btn.addEventListener('click', () => {
+      const r = modalResolve; modalResolve = null; closeModal(); r && r(btn.dataset.k);
+    }));
+  });
+}
+function editDialog(book) {
+  const p = openModal(`<h3>編輯《${esc(book.title)}》</h3>
+    <form id="editForm">
+      <label for="eTitle">書名</label><input type="text" id="eTitle" value="${esc(book.title)}" required>
+      <label for="eAuthor">作者</label><input type="text" id="eAuthor" value="${esc(book.author || '')}">
+      <p class="hint">${fmtChars(book.chars)} · ${book.chapters || 0} 章 · ${book.format === 'txt' ? '純文字' : 'Markdown'} · 加入於 ${new Date(book.addedAt || Date.now()).toLocaleDateString('zh-TW')}</p>
+      <div class="actions"><button class="btn danger left" type="button" data-del>刪除這本</button><button class="btn" type="button" data-x>取消</button><button class="btn primary" type="submit">儲存</button></div>
+    </form>`);
+  p.querySelector('[data-x]').onclick = closeModal;
+  p.querySelector('[data-del]').onclick = async () => {
+    closeModal();
+    const c = await ask({ title: `刪除《${book.title}》？`, body: '書檔和閱讀進度都會一起移除，無法復原。', buttons: [{ key: 'cancel', label: '取消' }, { key: 'del', label: '刪除', kind: 'primary' }] });
+    if (c !== 'del') return;
+    try { await S.backend.remove(book); toast(`已刪除《${book.title}》`); } catch (e) { toast(errMsg(e), 5000); }
+  };
+  p.querySelector('#editForm').addEventListener('submit', async e => {
+    e.preventDefault();
+    const title = $('#eTitle').value.trim().slice(0, 120), author = $('#eAuthor').value.trim().slice(0, 80);
+    if (!title) return;
+    closeModal();
+    try { await S.backend.update(book.id, { title, author }); toast('已儲存'); } catch (err) { toast(errMsg(err), 5000); }
+  });
+}
+
+/* ───────── 閱讀畫面 ───────── */
+const R = { view: 'library', book: null, chapters: [], ch: 0, blocks: [], libScroll: 0 };
+
+async function openBook(id) {
+  const book = id === GUIDE_ID ? guideBook() : S.books.find(b => b.id === id);
+  if (!book) return;
+  R.libScroll = scrollY;
+  R.book = book; R.chapters = []; R.blocks = [];
+  R.view = 'reader';
+  $('#library').hidden = true; $('#reader').hidden = false;
+  try { history.pushState({ shuxia: 'reader' }, ''); } catch {}
+  applyPrefs();
+  $('#rBook').textContent = book.title; $('#rChap').textContent = '';
+  $('#article').innerHTML = '<p class="loading">正在翻開…</p>';
+  window.scrollTo(0, 0);
+  let parsed = parsedCache.get(book.id);
+  const ver = book.asset || book.updatedAt || 0;
+  if (!parsed || parsed.ver !== ver) {
+    try {
+      const text = book.builtin ? GUIDE_MD : await S.backend.text(book);
+      parsed = Object.assign(parseBook(text, book.format || 'md'), { ver });
+      parsedCache.set(book.id, parsed);
+    } catch (e) {
+      $('#article').innerHTML = `<p class="err">這本書打不開：${esc(e.message || e)}</p>`; return;
+    }
+  }
+  if (R.book !== book) return;
+  R.chapters = parsed.chapters;
+  const p = getProgress(book.id);
+  const ch = p ? Math.min(Math.max(0, p.ch | 0), R.chapters.length - 1) : 0;
+  renderToc();
+  openChapter(ch, { block: p && (p.ch | 0) === ch ? (p.b | 0) : 0 });
+}
+
+function openChapter(i, { block = 0 } = {}) {
+  R.ch = i;
+  const c = R.chapters[i];
+  if (!c.html) { try { c.html = sanitize(c.render()); } catch (e) { c.html = `<p class="err">這一章顯示失敗：${esc(e.message)}</p>`; } }
+  const art = $('#article');
+  art.innerHTML = c.html;
+  art.querySelectorAll('a[href]').forEach(a => { a.target = '_blank'; a.rel = 'noopener'; });
+  R.blocks = $$('h1,h2,h3,h4,h5,h6,p,li,pre,blockquote,tr', art).filter(el => !el.querySelector('p,li,pre,tr,h1,h2,h3,h4,h5,h6'));
+  R.blocks.forEach((el, k) => { el.dataset.b = k; });
+  $('#rChap').textContent = c.title;
+  $('#chPos').textContent = `第 ${i + 1} / ${R.chapters.length} 章`;
+  $('#btnPrev').disabled = i === 0;
+  $('#btnNext').disabled = i === R.chapters.length - 1;
+  $('#btnNext').textContent = i === R.chapters.length - 1 ? '全書完' : '下一章';
+  $$('#tocList li').forEach((li, k) => li.classList.toggle('cur', k === i));
+  $('#reader').classList.remove('bars-hidden');
+  requestAnimationFrame(() => {
+    if (block > 0 && R.blocks[block]) scrollToBlock(block); else window.scrollTo(0, 0);
+    lastY = scrollY; updateReadBar(); savePos();
+  });
+}
+function goChapter(i) {
+  if (i < 0 || i >= R.chapters.length) return;
+  openChapter(i, { block: 0 });
+  T.b = 0; T.s = 0; T.chunks = null;
+  if (T.playing) restartSpeech(); else clearSpeaking();
+}
+function closeReader() {
+  if (R.view !== 'reader') return;
+  ttsStop();
+  savePos(); flushCloud();
+  closePanels();
+  R.view = 'library'; R.book = null;
+  $('#reader').hidden = true; $('#library').hidden = false;
+  applyPrefs();
+  renderLibrary();
+  requestAnimationFrame(() => window.scrollTo(0, R.libScroll || 0));
+}
+function renderToc() {
+  $('#tocMeta').textContent = `${R.chapters.length} 章`;
+  $('#tocList').innerHTML = R.chapters.map((c, k) => `<li><button type="button" data-ch="${k}"><span class="n">${k + 1}</span><span>${esc(c.title)}</span></button></li>`).join('');
+}
+function barH() { return $('#rbar').offsetHeight; }
+function scrollToBlock(b, smooth) {
+  const el = R.blocks[b]; if (!el) return;
+  const y = el.getBoundingClientRect().top + scrollY - barH() - 14;
+  window.scrollTo({ top: Math.max(0, y), behavior: smooth && !reduced ? 'smooth' : 'auto' });
+}
+function currentBlock() {
+  const bl = R.blocks; if (!bl.length) return 0;
+  const top = barH() + 4;
+  let lo = 0, hi = bl.length - 1, ans = hi;
+  while (lo <= hi) { const mid = (lo + hi) >> 1; if (bl[mid].getBoundingClientRect().bottom > top) { ans = mid; hi = mid - 1; } else lo = mid + 1; }
+  return ans;
+}
+function updateReadBar() {
+  const max = document.documentElement.scrollHeight - innerHeight;
+  $('#rprogBar').style.width = (max > 0 ? Math.min(100, scrollY / max * 100) : 100) + '%';
+}
+
+/* 進度：本機馬上記；GitHub 每存一次就是一個 commit，所以只在換章、回書架、離開頁面時存，
+   同一章讀很久時最多每 3 分鐘補存一次 */
+let posTimer = null, cloudTimer = null, pendingCloud = null, cloudBusy = false;
+const CLOUD_IDLE_MS = 180000;
+function schedulePos() { clearTimeout(posTimer); posTimer = setTimeout(savePos, 700); }
+function savePos() {
+  if (!R.book || !R.chapters.length) return;
+  const b = T.playing ? T.b : currentBlock();
+  const n = R.chapters.length;
+  const p = { ch: R.ch, b, pct: Math.min(1, (R.ch + (R.blocks.length ? (b + 1) / R.blocks.length : 1)) / n), t: (R.chapters[R.ch] && R.chapters[R.ch].title) || '', at: Date.now() };
+  LS.set('prog:' + R.book.id, p);
+  if (R.book.builtin || !canWrite()) return;
+  const saved = S.progress[R.book.id];
+  if (saved && saved.ch === p.ch && saved.b === p.b) { if (pendingCloud && pendingCloud.id === R.book.id) pendingCloud = null; return; }
+  const chChanged = !saved || saved.ch !== p.ch;
+  pendingCloud = { id: R.book.id, p };
+  if (chChanged) { clearTimeout(cloudTimer); cloudTimer = setTimeout(flushCloud, 1500); }
+  else if (!cloudTimer) cloudTimer = setTimeout(flushCloud, CLOUD_IDLE_MS);
+}
+async function flushCloud(keepalive) {
+  clearTimeout(cloudTimer); cloudTimer = null;
+  if (!pendingCloud || !canWrite()) return;
+  if (cloudBusy) { cloudTimer = setTimeout(flushCloud, 1500); return; }
+  const x = pendingCloud; pendingCloud = null; cloudBusy = true;
+  try { await GH.saveProgress(x.id, x.p, keepalive === true); }
+  catch { if (!pendingCloud) pendingCloud = x; cloudTimer = setTimeout(flushCloud, 30000); }
+  finally { cloudBusy = false; }
+}
+
+/* 連線 */
+async function connect(interactive) {
+  const conf = ghConf();
+  S.backend = null;
+  if (!conf.token) { S.mode = 'setup'; S.loaded = true; updateChip(); renderLibrary(); return false; }
+  S.mode = 'init'; S.loaded = false; updateChip(); renderLibrary();
+  try { const writable = await GH.init(conf); S.backend = GH; S.mode = writable ? 'gh' : 'readonly'; }
+  catch (e) { S.mode = 'error'; S.err = errMsg(e); if (interactive) toast(S.err, 6000); }
+  S.loaded = true; updateChip(); renderLibrary();
+  return S.mode === 'gh' || S.mode === 'readonly';
+}
+function connectDialog() {
+  const c = ghConf();
+  const p = openModal(`<h3>連上 GitHub 書架</h3>
+    <p class="m-body">書和閱讀進度存在私有 repo <b>${esc(c.owner)}/${esc(c.repo)}</b>。每台裝置第一次使用時貼一次 token，token 只存在這台裝置的瀏覽器裡。</p>
+    <form id="ghForm">
+      <label for="gToken">Fine-grained personal access token</label>
+      <input type="password" id="gToken" autocomplete="off" spellcheck="false" placeholder="${c.token ? '已儲存，要換才需要重貼' : 'github_pat_…'}" ${c.token ? '' : 'required'} autofocus>
+      <p class="hint">到 <a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener">GitHub 產生 token</a>：Repository access 只選 ${esc(c.repo)}，Permissions 的 Contents 設成 Read and write。</p>
+      <details style="margin-top:10px"><summary style="font-size:13px;color:var(--muted);cursor:pointer">換 repo（一般不用動）</summary>
+        <label for="gRepo">owner/repo</label><input type="text" id="gRepo" value="${esc(c.owner + '/' + c.repo)}" spellcheck="false">
+      </details>
+      <div class="actions">${c.token ? '<button class="btn danger left" type="button" data-off>中斷連線</button>' : ''}<button class="btn" type="button" data-x>取消</button><button class="btn primary" type="submit">連線</button></div>
+    </form>`);
+  p.querySelector('[data-x]').onclick = closeModal;
+  const off = p.querySelector('[data-off]');
+  if (off) off.onclick = async () => {
+    closeModal();
+    const a = await ask({ title: '中斷這台裝置的連線？', body: '會把 token 從這台裝置刪掉，書架上的書和其他裝置不受影響。之後要再讀，得重貼 token。', buttons: [{ key: 'cancel', label: '取消' }, { key: 'off', label: '中斷連線', kind: 'primary' }] });
+    if (a !== 'off') return;
+    await flushCloud();
+    LS.del('gh'); S.books = []; S.progress = {}; textCache.clear(); parsedCache.clear();
+    connect(false);
+  };
+  p.querySelector('#ghForm').addEventListener('submit', async e => {
+    e.preventDefault();
+    const token = $('#gToken').value.trim() || c.token;
+    const m = ($('#gRepo').value.trim() || '').match(/^([\w.-]+)\/([\w.-]+)$/);
+    if (!token) return;
+    const next = { token };
+    if (m && (m[1] !== GH_DEFAULT.owner || m[2] !== GH_DEFAULT.repo)) { next.owner = m[1]; next.repo = m[2]; }
+    const prev = LS.get('gh', null);
+    LS.set('gh', next); closeModal();
+    toast('連線中…', 0);
+    if (await connect(true)) toast(`已連上 ${ghConf().owner}/${ghConf().repo}`);
+    else if (prev && prev.token && prev.token !== token) { LS.set('gh', prev); connect(false); }
+  });
+}
+
+let lastY = 0;
+function onScroll() {
+  if (R.view !== 'reader') return;
+  const y = scrollY, dy = y - lastY;
+  if (!panelOpen()) {
+    if (dy > 12 && y > 120) { $('#reader').classList.add('bars-hidden'); lastY = y; }
+    else if (dy < -12 || y < 60) { $('#reader').classList.remove('bars-hidden'); lastY = y; }
+  }
+  updateReadBar(); schedulePos();
+}
+
+/* 偏好套用 */
+function applyPrefs() {
+  const rd = $('#reader');
+  rd.style.setProperty('--fs', prefs.fs + 'px');
+  rd.style.setProperty('--lh', prefs.lh);
+  rd.style.setProperty('--font', FONTS[prefs.font] || FONTS.serif);
+  rd.style.setProperty('--measure', WIDTHS[prefs.width] || WIDTHS.m);
+  rd.classList.toggle('indent', !!prefs.indent);
+  if (R.view === 'reader' && prefs.theme !== 'auto') document.body.dataset.rtheme = prefs.theme;
+  else delete document.body.dataset.rtheme;
+  syncAa();
+}
+function syncAa() {
+  $('#fsRange').value = prefs.fs; $('#fsVal').textContent = prefs.fs + 'px';
+  $('#lhRange').value = prefs.lh;
+  $$('#fontSeg button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.v === prefs.font)));
+  $$('#widthSeg button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.v === prefs.width)));
+  $$('#themeSw .sw').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.v === prefs.theme)));
+  $('#indentChk').checked = !!prefs.indent;
+}
+function setPref(k, v) {
+  const keep = R.view === 'reader' ? (T.playing ? T.b : currentBlock()) : 0;
+  prefs[k] = v; savePrefs(); applyPrefs();
+  if (R.view === 'reader' && keep > 0) requestAnimationFrame(() => scrollToBlock(keep));
+}
+const setFs = v => setPref('fs', Math.max(14, Math.min(34, Math.round(v))));
+
+/* 面板 */
+function panelOpen() { return !$('#toc').hidden || !$('#aaSheet').hidden; }
+function openPanel(id) {
+  closePanels();
+  $(id).hidden = false; $('#scrim').hidden = false;
+  $('#reader').classList.remove('bars-hidden');
+  if (id === '#toc') { const cur = $('#tocList .cur'); if (cur) cur.scrollIntoView({ block: 'center' }); }
+}
+function closePanels() { $('#toc').hidden = true; $('#aaSheet').hidden = true; $('#scrim').hidden = true; }
+
+/* ───────── 朗讀（Web Speech API） ───────── */
+const synth = ('speechSynthesis' in window) ? window.speechSynthesis : null;
+const T = { playing: false, b: 0, s: 0, chunks: null, gen: 0, utter: null, errs: 0, sleepTimer: null, sleepAt: 0, stopAtChEnd: false, wake: null, voices: [], tick: null };
+
+function blockText(i) { const el = R.blocks[i]; return el ? el.textContent.replace(/\s+/g, ' ').trim() : ''; }
+function chunksOf(text) {
+  if (!text) return [];
+  const sentences = text.match(/[^。！？!?；;…]+[。！？!?；;…]*[」』”’"'）)]*|[。！？!?；;…]+/g) || [text];
+  const out = []; let buf = '';
+  const push = s => {
+    while (s.length > 200) {
+      const cut = Math.max(s.lastIndexOf('，', 160), s.lastIndexOf(',', 160), s.lastIndexOf('、', 160));
+      const k = cut > 40 ? cut + 1 : 160; out.push(s.slice(0, k)); s = s.slice(k);
+    }
+    if (s) out.push(s);
+  };
+  for (let s of sentences) {
+    s = s.trim(); if (!s) continue;
+    if (buf && (buf + s).length > 140) { push(buf); buf = s; } else buf += s;
+  }
+  if (buf) push(buf);
+  return out;
+}
+function loadVoices() {
+  if (!synth) return;
+  T.voices = synth.getVoices();
+  const zhRank = v => /zh[-_]TW|Taiwan/i.test(v.lang + v.name) ? 0 : /zh[-_]HK|Hong Kong/i.test(v.lang + v.name) ? 1 : 2;
+  const zh = T.voices.filter(v => /^(zh|cmn|yue)/i.test(v.lang)).sort((a, b) => zhRank(a) - zhRank(b) || a.name.localeCompare(b.name));
+  const other = T.voices.filter(v => !/^(zh|cmn|yue)/i.test(v.lang));
+  const opt = v => `<option value="${esc(v.voiceURI)}">${esc(v.name.replace(/^Microsoft\s+|\s*-\s*Chinese.*$/g, '') + '（' + v.lang + '）')}</option>`;
+  const sel = $('#voiceSel');
+  sel.innerHTML = (zh.length ? `<optgroup label="中文">${zh.map(opt).join('')}</optgroup>` : '') + (other.length ? `<optgroup label="其他語言">${other.map(opt).join('')}</optgroup>` : '') || '<option value="">（瀏覽器預設）</option>';
+  const v = currentVoice(); if (v) sel.value = v.voiceURI;
+}
+function currentVoice() {
+  const vs = T.voices; if (!vs.length) return null;
+  return vs.find(v => v.voiceURI === prefs.voice)
+    || vs.find(v => /zh[-_]TW/i.test(v.lang) && /natural|online/i.test(v.name))
+    || vs.find(v => /zh[-_]TW/i.test(v.lang))
+    || vs.find(v => /^zh/i.test(v.lang)) || null;
+}
+function openPlayer() {
+  if (!synth) { toast('這個瀏覽器不支援朗讀'); return; }
+  $('#player').hidden = false; $('#reader').classList.add('with-player'); document.body.classList.add('player-open');
+  if (!T.voices.length) loadVoices();
+  if (!T.playing) ttsStart(currentBlock());
+}
+function ttsStart(b) {
+  T.b = Math.max(0, b); T.s = 0; T.chunks = null; T.playing = true; T.errs = 0;
+  acquireWake(); restartSpeech(); updatePlayer();
+}
+function restartSpeech() {
+  const g = ++T.gen;
+  synth.cancel();
+  setTimeout(() => { if (g === T.gen && T.playing) speakNext(g); }, 90);
+}
+function speakNext(g) {
+  if (g !== T.gen || !T.playing) return;
+  for (;;) {
+    if (T.b >= R.blocks.length) {
+      if (T.stopAtChEnd) { setSleep('0'); ttsPause(); toast('這一章念完了，已停止'); return; }
+      if (R.ch < R.chapters.length - 1) { openChapter(R.ch + 1, { block: 0 }); T.b = 0; T.s = 0; T.chunks = null; continue; }
+      ttsPause(); clearSpeaking(); toast('全書念完了'); return;
+    }
+    if (!T.chunks) T.chunks = chunksOf(blockText(T.b));
+    if (T.s < T.chunks.length) break;
+    T.b++; T.s = 0; T.chunks = null;
+  }
+  markSpeaking(T.b);
+  const u = new SpeechSynthesisUtterance(T.chunks[T.s]);
+  const v = currentVoice();
+  if (v) { u.voice = v; u.lang = v.lang; } else u.lang = 'zh-TW';
+  u.rate = prefs.rate; u.pitch = 1;
+  u.onend = () => { if (g !== T.gen) return; T.errs = 0; T.s++; speakNext(g); };
+  u.onerror = e => {
+    if (g !== T.gen || e.error === 'interrupted' || e.error === 'canceled') return;
+    if (++T.errs > 3) { ttsPause(); toast('朗讀出錯（' + e.error + '），換個語音試試', 5000); return; }
+    T.s++; speakNext(g);
+  };
+  T.utter = u; synth.speak(u); updatePlayer(); schedulePos();
+}
+function ttsPause() { T.playing = false; T.gen++; if (synth) synth.cancel(); releaseWake(); updatePlayer(); }
+function ttsToggle() {
+  if (T.playing) { ttsPause(); return; }
+  T.playing = true; T.errs = 0; acquireWake(); restartSpeech(); updatePlayer();
+}
+function ttsStop() {
+  if (!synth) return;
+  ttsPause(); clearSpeaking(); setSleep('0');
+  $('#player').hidden = true; $('#reader').classList.remove('with-player'); document.body.classList.remove('player-open');
+}
+function ttsJump(delta) {
+  T.b = Math.max(0, Math.min(R.blocks.length - 1, T.b + delta)); T.s = 0; T.chunks = null;
+  if (T.playing) restartSpeech(); else { markSpeaking(T.b); updatePlayer(); }
+}
+function markSpeaking(b) {
+  const prev = $('#article .speaking'); if (prev) prev.classList.remove('speaking');
+  const el = R.blocks[b]; if (!el) return;
+  el.classList.add('speaking');
+  const r = el.getBoundingClientRect();
+  const bottomLimit = innerHeight - ($('#player').hidden ? 0 : $('#player').offsetHeight) - 20;
+  if (r.top < barH() + 10 || r.bottom > bottomLimit) {
+    const y = r.top + scrollY - Math.max(barH() + 20, (bottomLimit - r.height) * 0.35);
+    window.scrollTo({ top: Math.max(0, y), behavior: reduced ? 'auto' : 'smooth' });
+  }
+}
+function clearSpeaking() { const prev = $('#article .speaking'); if (prev) prev.classList.remove('speaking'); }
+function updatePlayer() {
+  const btn = $('#pPlay');
+  btn.innerHTML = T.playing ? I.pause : I.play;
+  btn.setAttribute('aria-label', T.playing ? '暫停' : '播放');
+  $('#pTitle').textContent = (R.chapters[R.ch] && R.chapters[R.ch].title) || '';
+  let sub = R.blocks.length ? `第 ${Math.min(T.b + 1, R.blocks.length)} / ${R.blocks.length} 段` : '';
+  if (T.sleepAt) { const m = Math.max(0, Math.ceil((T.sleepAt - Date.now()) / 60000)); sub += ` · ${m} 分鐘後停止`; }
+  else if (T.stopAtChEnd) sub += ' · 念完這章停止';
+  if (!T.playing) sub += ' · 已暫停';
+  $('#pSub').textContent = sub;
+}
+function setSleep(v) {
+  clearTimeout(T.sleepTimer); clearInterval(T.tick); T.sleepTimer = null; T.sleepAt = 0; T.stopAtChEnd = false;
+  $('#sleepSel').value = v;
+  if (v === 'ch') T.stopAtChEnd = true;
+  else if (+v > 0) {
+    T.sleepAt = Date.now() + (+v) * 60000;
+    T.sleepTimer = setTimeout(() => { setSleep('0'); ttsPause(); toast('時間到，已停止朗讀'); }, (+v) * 60000);
+    T.tick = setInterval(updatePlayer, 30000);
+  }
+  updatePlayer();
+}
+async function acquireWake() {
+  try { if ('wakeLock' in navigator && !T.wake) { T.wake = await navigator.wakeLock.request('screen'); T.wake.addEventListener('release', () => { T.wake = null; }); } } catch {}
+}
+function releaseWake() { try { if (T.wake) T.wake.release(); } catch {} T.wake = null; }
+
+/* ───────── 事件 ───────── */
+function wire() {
+  $('#btnBack').innerHTML = I.back; $('#btnToc').innerHTML = I.toc; $('#btnTts').innerHTML = I.phones;
+  $$('[data-close]').forEach(b => { b.innerHTML = I.close; b.addEventListener('click', closePanels); });
+  $('#pPrev').innerHTML = I.prev; $('#pNext').innerHTML = I.next; $('#pPlay').innerHTML = I.play;
+  $('#pTune').innerHTML = I.tune; $('#pClose').innerHTML = I.close;
+  $('#sortSel').value = prefs.sort;
+  $('#rateSel').value = String(prefs.rate);
+  if (!synth) $('#btnTts').hidden = true;
+
+  // 書架
+  $('#btnImport').onclick = () => $('#fileInput').click();
+  $('#fileInput').addEventListener('change', e => { const f = e.target.files; if (f && f.length) importFiles(f); e.target.value = ''; });
+  $('#sortSel').onchange = e => { prefs.sort = e.target.value; savePrefs(); renderLibrary(); };
+  $('#syncChip').onclick = connectDialog;
+  $('#library').addEventListener('click', e => {
+    if (e.target.closest('[data-connect]')) { connectDialog(); return; }
+    const ed = e.target.closest('[data-edit]');
+    if (ed) { const b = S.books.find(x => x.id === ed.dataset.edit); if (b) editDialog(b); return; }
+    const op = e.target.closest('[data-open]');
+    if (op) openBook(op.dataset.open);
+  });
+  let dragDepth = 0;
+  window.addEventListener('dragenter', e => { if (R.view !== 'library' || !canWrite() || !e.dataTransfer || ![...e.dataTransfer.types].includes('Files')) return; dragDepth++; $('#dropHint').hidden = false; });
+  window.addEventListener('dragleave', () => { if (dragDepth > 0 && --dragDepth === 0) $('#dropHint').hidden = true; });
+  window.addEventListener('dragover', e => { if (R.view === 'library' && canWrite()) e.preventDefault(); });
+  window.addEventListener('drop', e => {
+    if (R.view !== 'library' || !canWrite()) return;
+    e.preventDefault(); dragDepth = 0; $('#dropHint').hidden = true;
+    if (e.dataTransfer && e.dataTransfer.files.length) importFiles(e.dataTransfer.files);
+  });
+
+  // 閱讀
+  $('#btnBack').onclick = () => { if (history.state && history.state.shuxia === 'reader') history.back(); else closeReader(); };
+  window.addEventListener('popstate', () => { if (R.view === 'reader') closeReader(); });
+  $('#btnToc').onclick = () => openPanel('#toc');
+  $('#btnAa').onclick = () => { if ($('#aaSheet').hidden) openPanel('#aaSheet'); else closePanels(); };
+  $('#btnTts').onclick = () => { if ($('#player').hidden) openPlayer(); else ttsToggle(); };
+  $('#scrim').onclick = closePanels;
+  $('#btnPrev').onclick = () => goChapter(R.ch - 1);
+  $('#btnNext').onclick = () => goChapter(R.ch + 1);
+  $('#tocList').addEventListener('click', e => { const b = e.target.closest('[data-ch]'); if (!b) return; closePanels(); goChapter(+b.dataset.ch); });
+  $('#article').addEventListener('click', e => {
+    if (e.target.closest('a')) return;
+    const sel = window.getSelection && String(window.getSelection());
+    if (sel) return;
+    const blk = e.target.closest('[data-b]');
+    if (!$('#player').hidden && blk) { ttsStart(+blk.dataset.b); return; }
+    if (coarse) $('#reader').classList.toggle('bars-hidden');
+  });
+  window.addEventListener('scroll', onScroll, { passive: true });
+
+  // 設定
+  $('#fsRange').addEventListener('input', e => setFs(+e.target.value));
+  $('#fsDown').onclick = () => setFs(prefs.fs - 1);
+  $('#fsUp').onclick = () => setFs(prefs.fs + 1);
+  $('#lhRange').addEventListener('input', e => setPref('lh', +(+e.target.value).toFixed(1)));
+  $('#fontSeg').addEventListener('click', e => { const b = e.target.closest('[data-v]'); if (b) setPref('font', b.dataset.v); });
+  $('#widthSeg').addEventListener('click', e => { const b = e.target.closest('[data-v]'); if (b) setPref('width', b.dataset.v); });
+  $('#themeSw').addEventListener('click', e => { const b = e.target.closest('[data-v]'); if (b) setPref('theme', b.dataset.v); });
+  $('#indentChk').addEventListener('change', e => setPref('indent', e.target.checked));
+
+  // 朗讀
+  $('#pPlay').onclick = ttsToggle;
+  $('#pPrev').onclick = () => ttsJump(-1);
+  $('#pNext').onclick = () => ttsJump(1);
+  $('#pClose').onclick = ttsStop;
+  $('#pTune').onclick = () => { const o = $('#pOpts'); o.hidden = !o.hidden; $('#pTune').setAttribute('aria-expanded', String(!o.hidden)); };
+  $('#rateSel').onchange = e => { prefs.rate = +e.target.value; savePrefs(); if (T.playing) restartSpeech(); };
+  $('#voiceSel').onchange = e => { prefs.voice = e.target.value; savePrefs(); if (T.playing) restartSpeech(); };
+  $('#sleepSel').onchange = e => setSleep(e.target.value);
+  if (synth) { synth.cancel(); loadVoices(); if ('onvoiceschanged' in synth) synth.addEventListener('voiceschanged', loadVoices); }
+
+  // 對話框
+  $('#modal').addEventListener('click', e => { if (e.target.id === 'modal') closeModal(); });
+
+  // 鍵盤
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') {
+      if (!$('#modal').hidden) { closeModal(); return; }
+      if (panelOpen()) { closePanels(); return; }
+      if (R.view === 'reader' && !$('#player').hidden) { ttsStop(); return; }
+      if (R.view === 'reader') { $('#btnBack').click(); }
+      return;
+    }
+    if (R.view !== 'reader' || !$('#modal').hidden || e.ctrlKey || e.metaKey || e.altKey) return;
+    if (/^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName)) return;
+    if (e.key === 'ArrowLeft') { goChapter(R.ch - 1); e.preventDefault(); }
+    else if (e.key === 'ArrowRight') { goChapter(R.ch + 1); e.preventDefault(); }
+    else if (e.key === '+' || e.key === '=') setFs(prefs.fs + 1);
+    else if (e.key === '-' || e.key === '_') setFs(prefs.fs - 1);
+    else if (e.key === 'p' || e.key === 'P') { if ($('#player').hidden) openPlayer(); else ttsToggle(); }
+    else if (e.key === 't' || e.key === 'T') { if ($('#toc').hidden) openPanel('#toc'); else closePanels(); }
+  });
+
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') { savePos(); flushCloud(true); }
+    else {
+      if (T.playing) { acquireWake(); if (synth && !synth.speaking) restartSpeech(); }
+      // 切回來時抓一次別台裝置的最新書架與進度
+      if (S.backend === GH && Date.now() - lastRefresh > 30000 && !cloudBusy) { lastRefresh = Date.now(); GH.refresh().catch(() => {}); }
+      if (R.view === 'library' && $('#modal').hidden) renderLibrary();
+    }
+  });
+  window.addEventListener('pagehide', () => { savePos(); flushCloud(true); });
+}
+
+/* ───────── 啟動 ───────── */
+let lastRefresh = Date.now();
+async function init() {
+  wire(); applyPrefs(); renderLibrary();
+  await connect(false);
+  // 「上次閱讀 N 分鐘前」要跟著時間走
+  setInterval(() => { if (R.view === 'library' && $('#modal').hidden && document.visibilityState === 'visible') renderLibrary(); }, 60000);
+}
+init();
+})();
+</script>

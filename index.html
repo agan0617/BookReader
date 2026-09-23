@@ -4,6 +4,14 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="apple-mobile-web-app-title" content="K書吧">
 <meta name="referrer" content="no-referrer">
+<meta name="theme-color" content="#EDEFEB" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#121519" media="(prefers-color-scheme: dark)">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png" type="image/png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
 <title>K書吧</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -529,6 +537,8 @@ K書吧讀的是純文字書檔：**.md**（Markdown）或 **.txt**。叫 AI 寫
 - 也可以直接請 Claude 把寫好的書放上書架。
 
 書在兩個地方各有一份：**每台裝置的瀏覽器裡**一份，**你的私有 GitHub repo** BookShelf 一份。每次打開K書吧，會先擺出這台裝置上的書，再跟 GitHub 比對：有新書就下載、改版就更新、別台裝置刪掉的就移除。所以沒網路也能讀已經下載的書，打開也比較快。
+
+**離線閱讀**：頁面本身也會存一份在裝置上（第一次上網打開時就存好），之後在沒有網路的地方——飛機上、捷運裡——直接打開K書吧或 App 一樣能讀。右上角會顯示「離線・本機書架」，這時不能匯入或刪書；讀到哪先記在本機，網路回來會自動連上並把進度補傳。手機瀏覽器可以用「加到主畫面」把K書吧裝成 App 圖示，打開更快。
 
 閱讀進度也存在 GitHub，記成**一格一格**的：每台裝置（電腦、手機瀏覽器、手機 App）每讀到新的一章記一格，同一章只更新位置，最多留 30 格、舊的自動掉出去，所以裝置之間不會互相蓋掉。換章、回書架、離開頁面時會同步，讀同一章很久時最多每 3 分鐘存一次。
 
@@ -1985,6 +1995,10 @@ function wire() {
     else if (e.key === 't' || e.key === 'T') { if ($('#toc').hidden) openPanel('#toc'); else closePanels(); }
   });
 
+  // 離線讀完、網路回來：重新連上書架，把本機累積的進度推上去
+  window.addEventListener('online', () => {
+    if (S.mode === 'error' && ghConf().token && !cloudBusy) { lastRefresh = Date.now(); connect(false); }
+  });
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'hidden') { savePos(); flushCloud(true); }
     else {
@@ -2006,6 +2020,11 @@ function wire() {
 let lastRefresh = Date.now();
 async function init() {
   wire(); applyPrefs(); renderLibrary();
+  // 離線也打得開：Service Worker（sw.js）把頁面、marked／DOMPurify、字型存在裝置上；書檔本來就在 IndexedDB。
+  // 有網路時 sw 仍一律抓最新頁面，抓不到才用存的那份
+  if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
+    navigator.serviceWorker.register('sw.js').catch(() => {});
+  }
   await connect(false);
   // 「上次閱讀 N 分鐘前」要跟著時間走
   setInterval(() => { if (R.view === 'library' && $('#modal').hidden && document.visibilityState === 'visible') renderLibrary(); }, 60000);

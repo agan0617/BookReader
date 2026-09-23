@@ -340,7 +340,7 @@ body.player-open .toast{bottom:calc(150px + env(safe-area-inset-bottom,0px))}
       <button class="icon" type="button" id="pNext" aria-label="下一段"></button>
       <div class="p-status"><b id="pTitle"></b><span id="pSub"></span></div>
       <button class="icon" type="button" id="pTune" aria-label="朗讀設定" aria-expanded="false"></button>
-      <button class="icon" type="button" id="pClose" aria-label="收起朗讀面板（朗讀會繼續）" title="收起面板，朗讀會繼續；按上方耳機再打開"></button>
+      <button class="icon" type="button" id="pClose" aria-label="收起朗讀面板（朗讀會繼續）" title="收起面板，朗讀會繼續；按耳機左邊的設定鈕再打開"></button>
     </div>
     <div class="p-opts" id="pOpts" hidden>
       <label>速度
@@ -520,12 +520,12 @@ K書吧會自動找章節，不用自己設定：
 上方工具列固定在頂端，不會自動收起。
 
 ## 朗讀
-點右上角的**耳機**，會從畫面上的段落開始念。念到哪一段會標出來並自動捲動，章尾接著念下一章。
+點右上角的**耳機**，會從畫面上的段落開始念；再點一次就停。只有開始／停止，不會跳出任何面板。念到哪一段會標出來並自動捲動，章尾接著念下一章。
 
-耳機左邊的**設定鈕**會叫出下方的播放面板和朗讀設定（速度、語音、定時停止、音量），不會馬上開始念，按播放鍵才念；再按一次就收起。
+耳機左邊的**設定鈕**會叫出下方的播放面板和朗讀設定（速度、語音、定時停止、音量、上一段／下一段），不會馬上開始念，按播放鍵才念；再按一次就收起。
 
-- 朗讀時**點任何一段**，就從那一段開始念。
-- 播放面板右邊的 **✕** 只是把面板收起來，朗讀會繼續；上方的耳機會亮著，點它再把面板叫出來。要停就按暫停。
+- 播放面板開著時**點任何一段**，就從那一段開始念。
+- 播放面板右邊的 **✕** 只是把面板收起來，朗讀會繼續；上方的耳機會亮著，點它就停，點設定鈕再把面板叫出來。
 - 可以調**速度**、**音量**、換**語音**，這些設定每台裝置各自記住，下次打開還在。iPhone／iPad 的 Safari 不理會網頁設的朗讀音量，要用手機的音量鍵調。用的是瀏覽器或系統內建的語音，Windows 上建議選名稱有「Chinese (Traditional, Taiwan)」的那個。
 - **定時停止**：15 到 60 分鐘，或念完這一章就停，適合睡前聽。選過的時間會記住，下次開始朗讀時自動套用。
 - 朗讀時會盡量讓螢幕保持亮著。切到別的 App 或鎖定螢幕時，K書吧 會設法讓朗讀繼續，通知欄和鎖定畫面也有播放、暫停、上一段／下一段的按鈕；不過有些手機的瀏覽器還是會把朗讀停掉，回到 K書吧 就會接著念。
@@ -1413,6 +1413,14 @@ function showPlayerSettings() {
   if (!T.playing) { T.b = currentBlock(); T.s = 0; T.chunks = null; }
   updatePlayer();
 }
+// 耳機鈕：只開始／停止朗讀，不叫出面板（2026-09-23 Ken 指定）。面板與設定走耳機左邊的設定鈕。
+function ttsQuickToggle() {
+  if (!canSpeak()) { toast('這個瀏覽器不支援朗讀'); return; }
+  if (T.playing) { ttsPause(); clearSpeaking(); return; }
+  if (NATIVE ? !$('#voiceSel').options.length : !T.voices.length) loadVoices();
+  if (!T.sleepAt && !T.stopAtChEnd && prefs.sleep && prefs.sleep !== '0') setSleep(prefs.sleep);
+  ttsStart(currentBlock());
+}
 function openPlayer() {
   if (!canSpeak()) { toast('這個瀏覽器不支援朗讀'); return; }
   showPlayer();
@@ -1520,7 +1528,7 @@ function ttsStop() {
   ttsPause(); clearSpeaking(); setSleep('0');
   hidePlayer();
 }
-// 只收起播放面板，朗讀照常；按上方耳機再叫出來
+// 只收起播放面板，朗讀照常；按耳機左邊的設定鈕再叫出來
 function hidePlayer() {
   $('#player').hidden = true; $('#reader').classList.remove('with-player'); document.body.classList.remove('player-open');
 }
@@ -1546,7 +1554,7 @@ function updatePlayer() {
   btn.innerHTML = T.playing ? I.pause : I.play;
   btn.setAttribute('aria-label', T.playing ? '暫停' : '播放');
   $('#btnTts').classList.toggle('on', T.playing);
-  $('#btnTts').setAttribute('aria-label', T.playing ? '朗讀中，打開朗讀面板' : '朗讀');
+  $('#btnTts').setAttribute('aria-label', T.playing ? '朗讀中，點一下停止' : '朗讀');
   updateMediaSession();
   $('#pTitle').textContent = (R.chapters[R.ch] && R.chapters[R.ch].title) || '';
   let sub = R.blocks.length ? `第 ${Math.min(T.b + 1, R.blocks.length)} / ${R.blocks.length} 段` : '';
@@ -1610,7 +1618,7 @@ function wire() {
   window.addEventListener('popstate', () => { if (R.view === 'reader') closeReader(); });
   $('#btnToc').onclick = () => openPanel('#toc');
   $('#btnAa').onclick = () => { if ($('#aaSheet').hidden) openPanel('#aaSheet'); else closePanels(); };
-  $('#btnTts').onclick = () => { if ($('#player').hidden) openPlayer(); else ttsToggle(); };
+  $('#btnTts').onclick = () => { if ($('#player').hidden) ttsQuickToggle(); else ttsToggle(); };
   // 朗讀設定鈕：叫出播放面板並展開設定（不自動開始念）；已經開著就收起
   $('#btnTtsSet').onclick = () => { if (!$('#player').hidden && !$('#pOpts').hidden) hidePlayer(); else showPlayerSettings(); };
   $('#scrim').onclick = closePanels;
@@ -1671,7 +1679,7 @@ function wire() {
     else if (e.key === 'ArrowRight') { goChapter(R.ch + 1); e.preventDefault(); }
     else if (e.key === '+' || e.key === '=') setFs(prefs.fs + 1);
     else if (e.key === '-' || e.key === '_') setFs(prefs.fs - 1);
-    else if (e.key === 'p' || e.key === 'P') { if ($('#player').hidden) openPlayer(); else ttsToggle(); }
+    else if (e.key === 'p' || e.key === 'P') { if ($('#player').hidden) ttsQuickToggle(); else ttsToggle(); }
     else if (e.key === 't' || e.key === 'T') { if ($('#toc').hidden) openPanel('#toc'); else closePanels(); }
   });
 

@@ -95,6 +95,13 @@ button.chip:hover{border-color:var(--faint)}
 .dev-row:hover{border-color:var(--faint)}
 .dev-row b{color:var(--ink);font-weight:600;white-space:nowrap}
 .dev-row .t{overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.dev-row .chev{color:var(--faint)}
+.slot-list{margin-top:14px;max-height:min(60vh,520px);overflow-y:auto;padding-right:2px}
+.slot-row{display:grid;gap:3px;width:100%;padding:10px 14px;text-align:left;background:var(--surface);border:1px solid var(--line);border-radius:10px;font-size:13.5px;color:var(--muted);font-variant-numeric:tabular-nums}
+.slot-row:hover{border-color:var(--faint)}
+.slot-row .t{color:var(--ink);font-weight:600;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.slot-row b{color:var(--ink);font-weight:500}
+.slot-row.mine b{color:var(--accent)}
 .bar{height:3px;border-radius:2px;background:var(--line);overflow:hidden}
 .bar i{display:block;height:100%;background:var(--accent);border-radius:2px}
 
@@ -515,9 +522,9 @@ K書吧讀的是純文字書檔：**.md**（Markdown）或 **.txt**。叫 AI 寫
 
 書在兩個地方各有一份：**每台裝置的瀏覽器裡**一份，**你的私有 GitHub repo** BookShelf 一份。每次打開K書吧，會先擺出這台裝置上的書，再跟 GitHub 比對：有新書就下載、改版就更新、別台裝置刪掉的就移除。所以沒網路也能讀已經下載的書，打開也比較快。
 
-閱讀進度也存在 GitHub，而且**每台裝置分開記**（電腦、手機瀏覽器、手機 App 各一份），不會互相蓋掉。換章、回書架、離開頁面時會同步，讀同一章很久時最多每 3 分鐘存一次。
+閱讀進度也存在 GitHub，記成**一格一格**的：每台裝置（電腦、手機瀏覽器、手機 App）每讀到新的一章記一格，同一章只更新位置，最多留 30 格、舊的自動掉出去，所以裝置之間不會互相蓋掉。換章、回書架、離開頁面時會同步，讀同一章很久時最多每 3 分鐘存一次。
 
-書架上方的「繼續閱讀」會打開最近讀的位置；如果別台裝置讀到的地方不一樣，底下會列出每台裝置讀到哪，點哪一個就從那裡繼續。直接點書架上的封面，則是從這台裝置自己讀到的地方開始。
+書架上方的「繼續閱讀」會打開最新的那一格；底下的「所有裝置的閱讀進度」會列出每台裝置、每本書讀到哪，點哪一格就從那裡接著讀。直接點書架上的封面，則是從這台裝置自己讀到的地方開始。
 
 ## 在新裝置上連上書架
 每台裝置（手機、電腦各自的瀏覽器）第一次打開K書吧時，要貼一次 GitHub token：
@@ -871,7 +878,10 @@ const GH = {
   },
   async remove(book) {
     await this.mutate('lib', lib => { lib.books = lib.books.filter(x => x.id !== book.id); return lib; }, `下架《${book.title}》`);
-    this.mutate('prog', o => { if (!(book.id in o)) return null; delete o[book.id]; return o; }, `進度：移除《${book.title}》`).catch(() => {});
+    this.mutate('prog', o => {
+      if (!(book.id in o) && !slotsOf(o).some(x => x.id === book.id)) return null;
+      delete o[book.id]; return withSlots(o, slotsOf(o).filter(x => x.id !== book.id));
+    }, `進度：移除《${book.title}》`).catch(() => {});
     if (book.file) this.del(book.file, `刪除書檔《${book.title}》`).catch(() => {});
     textCache.delete(book.id); parsedCache.delete(book.id); LS.del('prog:' + book.id); Store.del('text:' + book.id);
   },
@@ -891,22 +901,17 @@ const GH = {
     textCache.set(book.id, t); Store.set('text:' + book.id, { text: t, ver: book.updatedAt });
     return t;
   },
-  // 進度分裝置記：o[id].devs[裝置 id] 各自一份，外層的 ch/b/pct/t/at 是各裝置裡最新的那份（給舊程式與 bot 列書架用）
+  // 進度記成一格一格的 slot（o._slots，新的在前，最多 SLOTS 格）：這台裝置在這本書的這一章已經有一格就更新位置並提到最前，
+  // 換到新的一章才佔新的一格；別台裝置的格子不動，所以不會互相蓋掉。外層 o[書 id] 是那本書最新的一格（給舊程式與 bot 列書架用）
   saveProgress(id, p, keepalive) {
     const title = (S.books.find(b => b.id === id) || {}).title || id;
     return this.mutate('prog', o => {
-      const e = (o[id] && typeof o[id] === 'object') ? o[id] : {};
-      const devs = Object.assign({}, e.devs);
-      const mine = devs[DEV.id];
+      const slots = slotsOf(o);
+      const mine = slots.find(x => x.dev === DEV.id && x.id === id);
       if (mine && (mine.at || 0) > p.at) return null;
-      // 沒有 devs 的單一進度＝舊版頁面寫的（它會整筆蓋掉），一律保留成一筆，別台讀到的位置才不會不見
-      if (!e.devs && e.at) devs.legacy = { ch: e.ch, b: e.b, pct: e.pct, t: e.t, at: e.at, name: '其他裝置（舊版）' };
-      devs[DEV.id] = Object.assign({}, p, { name: DEV.name });
-      // 兩台以上都已經用新格式記了，舊版那筆就用不到了
-      if (Object.keys(devs).filter(k => k !== 'legacy').length >= 2) delete devs.legacy;
-      const latest = Object.values(devs).reduce((x, y) => ((y.at || 0) > (x.at || 0) ? y : x));
-      o[id] = { ch: latest.ch, b: latest.b, pct: latest.pct, t: latest.t, at: latest.at, devs };
-      return o;
+      const next = slots.filter(x => !(x.dev === DEV.id && x.id === id && x.ch === p.ch));
+      next.unshift({ id, dev: DEV.id, name: DEV.name, ch: p.ch, b: p.b, pct: p.pct, t: p.t, at: p.at });
+      return withSlots(o, next.slice(0, SLOTS));
     }, `進度：《${title}》第 ${p.ch + 1} 章（${DEV.name}）`, keepalive);
   }
 };
@@ -923,26 +928,81 @@ const DEV = (() => {
   }
   return d;
 })();
+/* 進度格（slot）：{ id 書, dev 裝置 id, name 裝置名, ch, b, pct, t, at }，全書架共用一條清單，新的在前，最多 SLOTS 格 */
+const SLOTS = 30;
+const byAt = (a, b) => (b.at || 0) - (a.at || 0);
+// 把 progress.json 攤成 slot 清單。舊格式（每本書 devs 裡各裝置一份、或沒有 devs 的單筆）也一併換算進來，
+// 所以還沒重新載入的舊版頁面寫的進度照樣看得到
+function slotsOf(o) {
+  const out = Array.isArray(o._slots) ? o._slots.filter(x => x && x.id && x.at).map(x => Object.assign({}, x)) : [];
+  const legacy = !Array.isArray(o._slots);
+  Object.keys(o).forEach(id => {
+    const e = o[id]; if (id === '_slots' || !e || typeof e !== 'object') return;
+    const devs = e.devs ? Object.entries(e.devs) : (legacy && e.at ? [['legacy', e]] : []);
+    devs.forEach(([dev, v]) => {
+      if (!v || !v.at) return;
+      const i = out.findIndex(x => x.dev === dev && x.id === id && x.ch === v.ch);
+      if (i >= 0 && (out[i].at || 0) >= v.at) return;
+      const x = { id, dev, name: v.name || (dev === 'legacy' ? '其他裝置（舊版）' : '其他裝置'), ch: v.ch, b: v.b, pct: v.pct, t: v.t, at: v.at };
+      if (i >= 0) out[i] = x; else out.push(x);
+    });
+  });
+  return out.sort(byAt);
+}
+// 組回要寫進 progress.json 的內容：_slots 放清單；每本書外層放它最新的一格（掉出清單的書仍保留原本那筆，書架上的百分比才不會不見）；
+// 舊格式的 devs 已經換算進 slot，不再保留
+function withSlots(o, slots) {
+  const n = { _slots: slots };
+  Object.keys(o).forEach(id => { const e = o[id]; if (id !== '_slots' && e && typeof e === 'object' && e.at) n[id] = { ch: e.ch, b: e.b, pct: e.pct, t: e.t, at: e.at }; });
+  slots.forEach(x => { if (!n[x.id] || (n[x.id].at || 0) < x.at) n[x.id] = { ch: x.ch, b: x.b, pct: x.pct, t: x.t, at: x.at }; });
+  return n;
+}
+let slotMemo = { src: null, list: [] };
+function allSlots() {
+  if (slotMemo.src !== S.progress) slotMemo = { src: S.progress, list: slotsOf(S.progress) };
+  return slotMemo.list;
+}
+// 這台裝置在這本書最新的一格（雲端的）
+const ownCloud = id => allSlots().find(x => x.dev === DEV.id && x.id === id) || null;
+// 這台裝置在這本書讀到哪：雲端那格和本機記的，取新的
 function ownProgress(id) {
-  const c = S.progress[id], a = c && c.devs && c.devs[DEV.id], b = LS.get('prog:' + id, null);
+  const a = ownCloud(id), b = LS.get('prog:' + id, null);
   if (!a) return b; if (!b) return a;
   return (a.at || 0) >= (b.at || 0) ? a : b;
 }
-// 各裝置讀到哪（新的在前）；mine＝這台
-function progressByDevice(id) {
-  const c = S.progress[id], out = [];
-  if (c && c.devs) Object.keys(c.devs).forEach(k => { const v = c.devs[k]; if (k !== DEV.id && v && v.at) out.push({ dev: k, name: v.name || '其他裝置', p: v, mine: false }); });
-  else if (c && c.at) out.push({ dev: 'legacy', name: '其他裝置（舊版）', p: c, mine: false });
-  const own = ownProgress(id);
-  if (own) out.push({ dev: DEV.id, name: DEV.name, p: own, mine: true });
-  return out.sort((a, b) => (b.p.at || 0) - (a.p.at || 0));
-}
-// 打開書的預設位置：這台自己的優先，這台沒讀過才用其他裝置最新的
+// 打開書的預設位置：這台自己的優先，這台沒讀過才用其他裝置最新的一格，再沒有就用外層那筆（格子掉出清單的舊書）
 function getProgress(id) {
   const own = ownProgress(id); if (own) return own;
-  const all = progressByDevice(id); return all.length ? all[0].p : null;
+  const s = allSlots().find(x => x.id === id); if (s) return s;
+  const e = S.progress[id]; return e && e.at ? e : null;
 }
-const newestAt = id => { const all = progressByDevice(id); return all.length ? (all[0].p.at || 0) : 0; };
+const newestAt = id => Math.max(0, ...[ownProgress(id), allSlots().find(x => x.id === id), S.progress[id]].map(x => (x && x.at) || 0));
+// 給「繼續閱讀」和進度清單用：雲端的格子加上這台還沒推上去的本機位置，只留還在書架上的書，新的在前
+function recentSlots() {
+  const have = new Set(S.books.map(b => b.id)), out = allSlots().filter(x => have.has(x.id));
+  S.books.forEach(b => {
+    const l = LS.get('prog:' + b.id, null); if (!l || !l.at) return;
+    const i = out.findIndex(x => x.dev === DEV.id && x.id === b.id && x.ch === l.ch);
+    if (i >= 0 && (out[i].at || 0) >= l.at) return;
+    const x = { id: b.id, dev: DEV.id, name: DEV.name, ch: l.ch, b: l.b, pct: l.pct, t: l.t, at: l.at };
+    if (i >= 0) out[i] = x; else out.push(x);
+  });
+  return out.sort(byAt);
+}
+const slotDev = x => esc(x.name) + (x.dev === DEV.id ? '（這台）' : '');
+const slotWhere = x => `第 ${x.ch + 1} 章${x.t ? ' · ' + esc(x.t) : ''}`;
+let pickList = [];
+// 所有裝置的閱讀進度：列出全部的格子讓 Ken 選一格接著讀
+function slotsDialog() {
+  const list = recentSlots();
+  const p = openModal(`<h3>所有裝置的閱讀進度</h3>
+    <p class="m-body">每台裝置每讀到新的一章記一格，最多留 ${SLOTS} 格、舊的自動掉出去。點一格就從那裡接著讀。</p>
+    <div class="dev-list slot-list">${list.map((x, i) => { const b = S.books.find(k => k.id === x.id); return `<button class="slot-row${x.dev === DEV.id ? ' mine' : ''}" type="button" data-slot="${i}">
+      <span class="t">《${esc(b.title)}》${slotWhere(x)}</span><span><b>${slotDev(x)}</b> · ${Math.round((x.pct || 0) * 100)}% · ${fmtAgo(x.at)}</span></button>`; }).join('')}</div>
+    <div class="actions"><button class="btn" type="button" data-x>關閉</button></div>`);
+  p.querySelector('[data-x]').onclick = closeModal;
+  p.querySelectorAll('[data-slot]').forEach(el => el.addEventListener('click', () => { const x = list[+el.dataset.slot]; closeModal(); if (x) openBook(x.id, x); }));
+}
 const guideBook = () => ({ id: GUIDE_ID, title: 'K書吧使用說明', author: 'K書吧', format: 'md', builtin: true, chars: countChars(GUIDE_MD), chapters: 6, addedAt: 0 });
 
 /* ───────── 書架畫面 ───────── */
@@ -964,26 +1024,21 @@ function renderLibrary() {
   const writable = canWrite();
   $('#btnImport').hidden = !writable;
 
-  // 繼續閱讀：每台裝置各取它最近讀的那本與位置（位置一樣也列），最新的放大卡片，其餘列在底下讓 Ken 自己選
-  const perDev = new Map();
-  books.forEach(b => progressByDevice(b.id).forEach(x => {
-    const cur = perDev.get(x.dev);
-    if (!cur || (x.p.at || 0) > (cur.p.at || 0)) perDev.set(x.dev, Object.assign({ b }, x));
-  }));
-  const entries = [...perDev.values()].sort((a, b) => (b.p.at || 0) - (a.p.at || 0));
+  // 繼續閱讀：最新的一格放大卡片、點了直接開；底下一顆鈕打開所有裝置的進度清單（最多 SLOTS 格）讓 Ken 自己選
+  pickList = recentSlots();
   const cont = $('#continue');
-  if (entries.length) {
-    const [top, ...others] = entries;
-    const devLabel = x => esc(x.name) + (x.mine ? '（這台）' : '');
-    const pct = Math.round((top.p.pct || 0) * 100);
-    cont.innerHTML = `<button class="continue-card" type="button" data-open="${esc(top.b.id)}" data-dev="${esc(top.dev)}">
-      ${coverHTML(top.b, false)}
-      <div style="min-width:0"><span class="eyebrow">繼續閱讀${others.length ? ' · ' + devLabel(top) : ''}</span><h2>${esc(top.b.title)}</h2>
-      <p>第 ${top.p.ch + 1} 章${top.p.t ? ' · ' + esc(top.p.t) : ''} · 已讀 ${pct}% · ${fmtAgo(top.p.at)}</p>
+  if (pickList.length) {
+    const top = pickList[0], tb = books.find(b => b.id === top.id);
+    const pct = Math.round((top.pct || 0) * 100);
+    const devNames = [...new Map(pickList.map(x => [x.dev, slotDev(x)])).values()];
+    cont.innerHTML = `<button class="continue-card" type="button" data-slot="0">
+      ${coverHTML(tb, false)}
+      <div style="min-width:0"><span class="eyebrow">繼續閱讀 · ${slotDev(top)}</span><h2>${esc(tb.title)}</h2>
+      <p>${slotWhere(top)} · 已讀 ${pct}% · ${fmtAgo(top.at)}</p>
       <div class="bar"><i style="width:${pct}%"></i></div></div>
       <span class="go">${I.arrow}</span></button>` +
-      (others.length ? `<div class="dev-list">${others.map(x => `<button class="dev-row" type="button" data-open="${esc(x.b.id)}" data-dev="${esc(x.dev)}">
-        <b>${devLabel(x)}</b><span class="t">${x.b.id !== top.b.id ? '《' + esc(x.b.title) + '》' : ''}第 ${x.p.ch + 1} 章${x.p.t ? ' · ' + esc(x.p.t) : ''}</span><span>${Math.round((x.p.pct || 0) * 100)}% · ${fmtAgo(x.p.at)}</span></button>`).join('')}</div>` : '');
+      (pickList.length > 1 ? `<div class="dev-list"><button class="dev-row" type="button" data-slots>
+        <b>所有裝置的閱讀進度</b><span class="t">${devNames.join('、')}</span><span>${pickList.length} 格 <span class="chev">›</span></span></button></div>` : '');
     cont.hidden = false;
   } else cont.hidden = true;
 
@@ -1271,7 +1326,7 @@ function savePos() {
   const p = { ch: R.ch, b, pct: Math.min(1, (R.ch + (R.blocks.length ? (b + 1) / R.blocks.length : 1)) / n), t: (R.chapters[R.ch] && R.chapters[R.ch].title) || '', at: Date.now() };
   LS.set('prog:' + R.book.id, p);
   if (R.book.builtin || !canWrite()) return;
-  const cloud = S.progress[R.book.id], saved = cloud && cloud.devs && cloud.devs[DEV.id];
+  const saved = ownCloud(R.book.id);
   if (saved && saved.ch === p.ch && saved.b === p.b) { if (pendingCloud && pendingCloud.id === R.book.id) pendingCloud = null; return; }
   const chChanged = !saved || saved.ch !== p.ch;
   pendingCloud = { id: R.book.id, p };
@@ -1321,7 +1376,7 @@ async function afterSync() {
     if (!canWrite()) return;
     const pend = {};
     for (const b of books) {
-      const l = LS.get('prog:' + b.id, null), e = S.progress[b.id], c = e && e.devs && e.devs[DEV.id];
+      const l = LS.get('prog:' + b.id, null), c = ownCloud(b.id);
       if (l && (!c || (l.at || 0) > (c.at || 0)) && (!c || l.ch !== c.ch || l.b !== c.b)) pend[b.id] = l;
     }
     for (const [id, p] of Object.entries(pend)) { try { await GH.saveProgress(id, p); } catch {} }
@@ -1774,12 +1829,12 @@ function wire() {
     if (e.target.closest('[data-connect]')) { connectDialog(); return; }
     const ed = e.target.closest('[data-edit]');
     if (ed) { const b = S.books.find(x => x.id === ed.dataset.edit); if (b) editDialog(b); return; }
+    if (e.target.closest('[data-slots]')) { slotsDialog(); return; }
     const op = e.target.closest('[data-open]');
-    if (op) {
-      // 從「繼續閱讀」點的：照那台裝置的位置開
-      const d = op.dataset.dev, hit = d ? progressByDevice(op.dataset.open).find(x => x.dev === d) : null;
-      openBook(op.dataset.open, hit ? hit.p : null);
-    }
+    if (op) { openBook(op.dataset.open, null); return; }
+    // 「繼續閱讀」卡片：照那一格的位置開
+    const sl = e.target.closest('[data-slot]');
+    if (sl) { const x = pickList[+sl.dataset.slot]; if (x) openBook(x.id, x); }
   });
   let dragDepth = 0;
   window.addEventListener('dragenter', e => { if (R.view !== 'library' || !canWrite() || !e.dataTransfer || ![...e.dataTransfer.types].includes('Files')) return; dragDepth++; $('#dropHint').hidden = false; });

@@ -1009,7 +1009,8 @@ function recentSlots() {
   return out.sort(byAt);
 }
 const slotDev = x => esc(x.name) + (x.dev === DEV.id ? '（這台）' : '');
-const slotWhere = x => `第 ${x.ch + 1} 章${x.t ? ' · ' + esc(x.t) : ''}`;
+// 有章名就只顯示章名：書裡的章名常自帶「第七章」，跟照順序算的章數（序章也算一章）疊在一起會對不上
+const slotWhere = x => x.t ? esc(x.t) : `第 ${x.ch + 1} 章`;
 let pickList = [];
 // 所有裝置的閱讀進度：列出全部的格子讓 Ken 選一格接著讀
 function slotsDialog() {

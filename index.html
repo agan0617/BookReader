@@ -205,6 +205,8 @@ input[type="range"]{width:100%;accent-color:var(--accent)}
 .p-opts{display:grid;grid-template-columns:1fr 2fr 1fr;gap:10px;padding-top:10px;margin-top:10px;border-top:1px solid var(--line)}
 .p-opts label{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--muted);min-width:0}
 .p-opts select{width:100%}
+.p-opts .vol{grid-column:1/-1}
+.vol-ctl{display:grid;grid-template-columns:1fr auto;align-items:center;gap:10px;min-height:36px}
 @media (max-width:560px){.p-opts{grid-template-columns:1fr 1fr}.p-opts .voice{grid-column:1/-1;order:-1}}
 .p-hint{margin:8px 0 0;font-size:12px;color:var(--faint)}
 
@@ -354,6 +356,9 @@ body.player-open .toast{bottom:calc(150px + env(safe-area-inset-bottom,0px))}
           <option value="45">45 分鐘</option><option value="60">60 分鐘</option><option value="ch">念完這章</option>
         </select>
       </label>
+      <label class="vol">音量
+        <span class="vol-ctl"><input type="range" id="volRange" min="0" max="100" step="5" aria-label="朗讀音量"><span class="fs-val" id="volVal"></span></span>
+      </label>
     </div>
     <p class="p-hint" id="pHint">點任何一段，就從那一段開始念。</p>
   </div>
@@ -448,7 +453,7 @@ const FONTS = {
 };
 const WIDTHS = { s: '30em', m: '38em', l: '48em' };
 const storedPrefs = LS.get('prefs', null);
-const prefs = Object.assign({ fs: matchMedia('(max-width: 600px)').matches ? 19 : 21, lh: 1.9, font: 'serif', theme: 'auto', width: 'm', indent: true, rate: 1, voice: '', sort: 'recent' }, storedPrefs || {});
+const prefs = Object.assign({ fs: matchMedia('(max-width: 600px)').matches ? 19 : 21, lh: 1.9, font: 'serif', theme: 'auto', width: 'm', indent: true, rate: 1, voice: '', volume: 1, sleep: '0', sort: 'recent' }, storedPrefs || {});
 const savePrefs = () => LS.set('prefs', prefs);
 
 /* ───────── 內建說明書 ───────── */
@@ -464,7 +469,9 @@ const GUIDE_MD = `# 書匣使用說明
 - **同名的書**：再匯入一次同書名的檔案，可以選「取代舊版」，閱讀進度會保留。書改版重寫時用這個。
 - 也可以直接請 Claude 把寫好的書放上書架。
 
-書和閱讀進度存在你的私有 GitHub repo（BookShelf）：手機和電腦連上同一個 repo，看到的就是同一個書架、同一個閱讀進度。進度在換章、回書架、離開頁面時同步，讀同一章的途中每幾分鐘也會存一次。
+書在兩個地方各有一份：**每台裝置的瀏覽器裡**一份，**你的私有 GitHub repo（BookShelf）**一份。每次打開書匣，會先擺出這台裝置上的書，再跟 GitHub 比對：有新書就下載、改版就更新、別台裝置刪掉的就移除。所以沒網路也能讀已經下載的書，打開也比較快。
+
+閱讀進度也存在 GitHub，手機和電腦共用同一份。換章、回書架、離開頁面時會同步，讀同一章很久時最多每 3 分鐘存一次。
 
 ## 在新裝置上連上書架
 每台裝置（手機、電腦各自的瀏覽器）第一次打開書匣時，要貼一次 GitHub token：
@@ -475,6 +482,8 @@ const GUIDE_MD = `# 書匣使用說明
 4. 產生後複製 token，回書匣按右上角的連線狀態，貼上後按「連線」。
 
 token 只存在那台裝置的瀏覽器裡，不會送到 GitHub 以外的地方。token 過期或換手機時，照上面的步驟重貼一次。手機弄丟時，到 GitHub 把那個 token 刪掉就好。
+
+在 iPhone 上建議用 Safari 把書匣「加入主畫面」，從主畫面圖示打開。太久沒打開時，Safari 可能會清掉網頁存的資料（包括 token 和本機的書），加到主畫面就不會被清。要是被清掉了，重貼 token，書會從 GitHub 再下載一次。
 
 ## 章節怎麼切
 書匣會自動找章節，不用自己設定：
@@ -513,8 +522,8 @@ token 只存在那台裝置的瀏覽器裡，不會送到 GitHub 以外的地方
 點右上角的**耳機**，會從畫面上的段落開始念。念到哪一段會標出來並自動捲動，章尾接著念下一章。
 
 - 朗讀時**點任何一段**，就從那一段開始念。
-- 可以調**速度**、換**語音**。用的是瀏覽器或系統內建的語音，Windows 上建議選名稱有「Chinese (Traditional, Taiwan)」的那個。
-- **定時停止**：15 到 60 分鐘，或念完這一章就停，適合睡前聽。
+- 可以調**速度**、**音量**、換**語音**，這些設定每台裝置各自記住，下次打開還在。iPhone／iPad 的 Safari 不理會網頁設的朗讀音量，要用手機的音量鍵調。用的是瀏覽器或系統內建的語音，Windows 上建議選名稱有「Chinese (Traditional, Taiwan)」的那個。
+- **定時停止**：15 到 60 分鐘，或念完這一章就停，適合睡前聽。選過的時間會記住，下次開始朗讀時自動套用。
 - 朗讀時會盡量讓螢幕保持亮著；手機鎖定螢幕後，有些手機會停止朗讀。
 
 ---
@@ -649,6 +658,35 @@ const textCache = new Map();
 const parsedCache = new Map();
 function emit() { if (R.view === 'library') renderLibrary(); }
 
+/* 本機副本：每台裝置的瀏覽器各存一份完整書架（IndexedDB）。打開時先顯示本機的，再跟 GitHub 比對：
+   lib／prog＝書目與進度（連 sha 一起存），text:<id>＝書檔（ver＝書目的 updatedAt，對不上就重抓） */
+const Store = {
+  p: null,
+  open() {
+    if (!this.p) this.p = new Promise(res => {
+      try {
+        const r = indexedDB.open('shuxia', 1);
+        r.onupgradeneeded = () => r.result.createObjectStore('kv');
+        r.onsuccess = () => res(r.result); r.onerror = () => res(null); r.onblocked = () => res(null);
+      } catch { res(null); }
+    });
+    return this.p;
+  },
+  async req(mode, fn) {
+    const db = await this.open(); if (!db) return undefined;
+    return new Promise(res => {
+      try { const q = fn(db.transaction('kv', mode).objectStore('kv')); q.onsuccess = () => res(q.result); q.onerror = () => res(undefined); }
+      catch { res(undefined); }
+    });
+  },
+  get(k) { return this.req('readonly', s => s.get(k)); },
+  set(k, v) { return this.req('readwrite', s => s.put(v, k)); },
+  del(k) { return this.req('readwrite', s => s.delete(k)); },
+  keys() { return this.req('readonly', s => s.getAllKeys()).then(k => k || []); },
+  clear() { return this.req('readwrite', s => s.clear()); }
+};
+try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {}); } catch {}
+
 const GH_DEFAULT = { owner: 'agan0617', repo: 'BookShelf', branch: '', token: '' };
 const ghConf = () => Object.assign({}, GH_DEFAULT, LS.get('gh', {}));
 const b64enc = s => { const u = new TextEncoder().encode(s); let bin = ''; for (let i = 0; i < u.length; i += 0x8000) bin += String.fromCharCode.apply(null, u.subarray(i, i + 0x8000)); return btoa(bin); };
@@ -692,10 +730,20 @@ const GH = {
     const sha = await this.sha(path); if (!sha) return;
     await this.api(`contents/${encPath(path)}`, { method: 'DELETE', body: JSON.stringify({ message, sha, branch: this.conf.branch }) });
   },
-  setLocal(kind, data, sha) {
-    if (kind === 'lib') { this.lib = data; this.libSha = sha; S.books = data.books.map(b => Object.assign({}, b)); }
-    else { this.prog = data; this.progSha = sha; S.progress = Object.assign({}, data); }
+  setLocal(kind, data, sha, fromCache) {
+    if (kind === 'lib') {
+      const old = new Map(S.books.map(b => [b.id, b.updatedAt]));
+      this.lib = data; this.libSha = sha; S.books = data.books.map(b => Object.assign({}, b));
+      S.books.forEach(b => { if (old.has(b.id) && old.get(b.id) !== b.updatedAt) textCache.delete(b.id); });
+    } else { this.prog = data; this.progSha = sha; S.progress = Object.assign({}, data); }
+    if (!fromCache) Store.set(kind, { data, sha });
     emit();
+  },
+  async loadCache() {
+    const [lib, prog] = await Promise.all([Store.get('lib'), Store.get('prog')]);
+    if (lib && lib.data && Array.isArray(lib.data.books)) this.setLocal('lib', lib.data, lib.sha, true);
+    if (prog && prog.data) this.setLocal('prog', prog.data, prog.sha, true);
+    return !!lib;
   },
   async refresh(kind) {
     const kinds = kind ? [kind] : ['lib', 'prog'];
@@ -733,29 +781,43 @@ const GH = {
     const id = newId(), file = bookFile(id, meta.format), now = Date.now();
     await this.put(file, text, null, `上架《${meta.title}》`);
     await this.mutate('lib', lib => { lib.books.push(Object.assign({ id }, meta, { file, addedAt: now, updatedAt: now })); return lib; }, `書目：加入《${meta.title}》`);
-    textCache.set(id, text);
+    textCache.set(id, text); Store.set('text:' + id, { text, ver: now });
     return id;
   },
   async replace(book, meta, text) {
-    const file = bookFile(book.id, meta.format);
+    const file = bookFile(book.id, meta.format), now = Date.now();
     await this.put(file, text, await this.sha(file), `改版《${meta.title}》`);
     if (book.file && book.file !== file) await this.del(book.file, `移除舊檔《${book.title}》`).catch(() => {});
-    await this.mutate('lib', lib => { const b = lib.books.find(x => x.id === book.id); if (!b) return null; Object.assign(b, meta, { file, updatedAt: Date.now() }); return lib; }, `書目：改版《${meta.title}》`);
-    textCache.set(book.id, text); parsedCache.delete(book.id);
+    await this.mutate('lib', lib => { const b = lib.books.find(x => x.id === book.id); if (!b) return null; Object.assign(b, meta, { file, updatedAt: now }); return lib; }, `書目：改版《${meta.title}》`);
+    textCache.set(book.id, text); parsedCache.delete(book.id); Store.set('text:' + book.id, { text, ver: now });
   },
   async update(id, patch) {
-    await this.mutate('lib', lib => { const b = lib.books.find(x => x.id === id); if (!b) return null; Object.assign(b, patch, { updatedAt: Date.now() }); return lib; }, `書目：修改《${patch.title || id}》`);
+    const now = Date.now();
+    // 只改書名／作者，書檔沒變：本機副本先換成新版本號，免得重抓
+    const c = await Store.get('text:' + id); if (c) await Store.set('text:' + id, { text: c.text, ver: now });
+    await this.mutate('lib', lib => { const b = lib.books.find(x => x.id === id); if (!b) return null; Object.assign(b, patch, { updatedAt: now }); return lib; }, `書目：修改《${patch.title || id}》`);
   },
   async remove(book) {
     await this.mutate('lib', lib => { lib.books = lib.books.filter(x => x.id !== book.id); return lib; }, `下架《${book.title}》`);
     this.mutate('prog', o => { if (!(book.id in o)) return null; delete o[book.id]; return o; }, `進度：移除《${book.title}》`).catch(() => {});
     if (book.file) this.del(book.file, `刪除書檔《${book.title}》`).catch(() => {});
-    textCache.delete(book.id); parsedCache.delete(book.id); LS.del('prog:' + book.id);
+    textCache.delete(book.id); parsedCache.delete(book.id); LS.del('prog:' + book.id); Store.del('text:' + book.id);
   },
+  // 書檔：記憶體 → 本機副本（版本對得上）→ GitHub（抓完存回本機）
   async text(book) {
     if (textCache.has(book.id)) return textCache.get(book.id);
-    const r = await this.api(`contents/${encPath(book.file || bookFile(book.id, book.format))}?${this.ref()}`, { headers: { Accept: 'application/vnd.github.raw+json' } });
-    const t = await r.text(); textCache.set(book.id, t); return t;
+    const c = await Store.get('text:' + book.id);
+    if (c && c.ver === book.updatedAt && typeof c.text === 'string') { textCache.set(book.id, c.text); return c.text; }
+    if (!this.conf || !this.conf.branch) {
+      if (c && typeof c.text === 'string') { textCache.set(book.id, c.text); return c.text; }
+      throw new Error('這本書還沒下載到這台裝置，連上 GitHub 後再開');
+    }
+    let r;
+    try { r = await this.api(`contents/${encPath(book.file || bookFile(book.id, book.format))}?${this.ref()}`, { headers: { Accept: 'application/vnd.github.raw+json' } }); }
+    catch (e) { if (c && typeof c.text === 'string') { textCache.set(book.id, c.text); return c.text; } throw e; }
+    const t = await r.text();
+    textCache.set(book.id, t); Store.set('text:' + book.id, { text: t, ver: book.updatedAt });
+    return t;
   },
   saveProgress(id, p, keepalive) {
     const title = (S.books.find(b => b.id === id) || {}).title || id;
@@ -786,7 +848,7 @@ function sortedBooks() {
 function renderLibrary() {
   const books = S.books;
   const total = books.reduce((s, b) => s + (b.chars || 0), 0);
-  $('#libSub').textContent = !S.loaded ? '正在打開書架…' : (S.mode === 'setup' || S.mode === 'error') ? '還沒連上書架' : books.length ? `${books.length} 本書 · 共 ${fmtChars(total)}` : '書架還是空的';
+  $('#libSub').textContent = !S.loaded ? '正在打開書架…' : (S.mode === 'setup' || (S.mode === 'error' && !books.length)) ? '還沒連上書架' : books.length ? `${books.length} 本書 · 共 ${fmtChars(total)}` : '書架還是空的';
   const writable = canWrite();
   $('#btnImport').hidden = !writable;
 
@@ -822,7 +884,7 @@ function renderLibrary() {
   if (S.mode === 'setup') {
     html = `<p class="empty">這台裝置還沒連上 GitHub 書架。第一次使用要貼一次 token，旁邊那本說明〈在新裝置上連上書架〉有步驟。<br><button class="btn primary" type="button" data-connect style="margin-top:12px">連上書架</button></p>` + html;
   } else if (S.mode === 'error') {
-    html = `<p class="empty">書架讀不到：${esc(S.err)}<br><button class="btn primary" type="button" data-connect style="margin-top:12px">重新連線</button></p>` + html;
+    html = `<p class="empty">${books.length ? '沒連上 GitHub，下面是這台裝置上的書，可以照常讀；新增或刪書要等連上之後。' : '書架讀不到。'}<br>${esc(S.err)}<br><button class="btn primary" type="button" data-connect style="margin-top:12px">重新連線</button></p>` + html;
   } else if (S.loaded && !books.length) {
     html = `<p class="empty">書架上還沒有書。${writable ? '按右上角「匯入檔案」選 AI 寫好的 .md／.txt' + (coarse ? '' : '，也可以把檔案直接拖進這個視窗') + '。' : ''}旁邊那本說明寫了書匣怎麼切章節、怎麼朗讀。</p>` + html;
   }
@@ -830,13 +892,15 @@ function renderLibrary() {
 }
 function updateChip() {
   const c = $('#syncChip');
-  const t = { init: '連線中', gh: 'GitHub 同步', readonly: '唯讀', setup: '尚未連線', error: '連線失敗' }[S.mode] || S.mode;
+  const hasLocal = S.books.length > 0;
+  let t = { init: hasLocal ? '同步中' : '連線中', gh: '已同步', readonly: '唯讀', setup: '尚未連線', error: hasLocal ? '離線・本機書架' : '連線失敗' }[S.mode] || S.mode;
+  if (S.syncing) t = S.syncing;
   const repo = ghConf();
   const tip = {
-    gh: `書和閱讀進度存在 ${repo.owner}/${repo.repo}，手機和電腦共用。點這裡可以換 token 或中斷連線`,
+    gh: `書存在這台裝置，也和 ${repo.owner}/${repo.repo} 同步；閱讀進度手機和電腦共用。點這裡可以換 token 或中斷連線`,
     readonly: '這個 token 只能讀，不能新增或修改書',
     setup: '點這裡貼上 GitHub token',
-    error: S.err
+    error: (hasLocal ? '連不上 GitHub，先讀這台裝置上的書。' : '') + S.err
   }[S.mode] || '';
   c.dataset.mode = S.mode; c.title = tip; c.lastElementChild.textContent = t;
 }
@@ -1091,15 +1155,47 @@ async function flushCloud(keepalive) {
 }
 
 /* 連線 */
+const online = () => S.mode === 'gh' || S.mode === 'readonly';
 async function connect(interactive) {
   const conf = ghConf();
-  S.backend = null;
+  S.backend = GH; S.syncing = '';
   if (!conf.token) { S.mode = 'setup'; S.loaded = true; updateChip(); renderLibrary(); return false; }
-  S.mode = 'init'; S.loaded = false; updateChip(); renderLibrary();
-  try { const writable = await GH.init(conf); S.backend = GH; S.mode = writable ? 'gh' : 'readonly'; }
+  // 先把本機副本擺上書架，再去跟 GitHub 對
+  const cached = S.books.length ? true : await GH.loadCache();
+  S.mode = 'init'; S.loaded = cached; updateChip(); renderLibrary();
+  try { const writable = await GH.init(conf); S.mode = writable ? 'gh' : 'readonly'; }
   catch (e) { S.mode = 'error'; S.err = errMsg(e); if (interactive) toast(S.err, 6000); }
   S.loaded = true; updateChip(); renderLibrary();
-  return S.mode === 'gh' || S.mode === 'readonly';
+  if (online()) { lastRefresh = Date.now(); afterSync(); }
+  return online();
+}
+// 跟 GitHub 對完書目後：補下載缺的／改版的書檔、清掉已下架的、把離線時讀的進度推上去
+let syncRunning = false;
+async function afterSync() {
+  if (syncRunning) return; syncRunning = true;
+  try {
+    const books = S.books.slice(), keep = new Set(books.map(b => 'text:' + b.id));
+    for (const k of await Store.keys()) if (String(k).startsWith('text:') && !keep.has(k)) await Store.del(k);
+    const need = [];
+    for (const b of books) { const c = await Store.get('text:' + b.id); if (!c || c.ver !== b.updatedAt) need.push(b); }
+    for (let i = 0; i < need.length && online(); i++) {
+      S.syncing = `下載 ${i + 1}/${need.length}`; updateChip();
+      textCache.delete(need[i].id);
+      try { await GH.text(need[i]); } catch {}
+    }
+    S.syncing = ''; updateChip();
+    if (!canWrite()) return;
+    const pend = {};
+    for (const b of books) {
+      const l = LS.get('prog:' + b.id, null), c = S.progress[b.id];
+      if (l && (!c || (l.at || 0) > (c.at || 0)) && (!c || l.ch !== c.ch || l.b !== c.b)) pend[b.id] = l;
+    }
+    if (Object.keys(pend).length) await GH.mutate('prog', o => {
+      let changed = false;
+      for (const [id, p] of Object.entries(pend)) if (!o[id] || (o[id].at || 0) < p.at) { o[id] = p; changed = true; }
+      return changed ? o : null;
+    }, '進度：補上沒同步到的閱讀進度').catch(() => {});
+  } finally { syncRunning = false; S.syncing = ''; updateChip(); }
 }
 function connectDialog() {
   const c = ghConf();
@@ -1122,6 +1218,8 @@ function connectDialog() {
     if (a !== 'off') return;
     await flushCloud();
     LS.del('gh'); S.books = []; S.progress = {}; textCache.clear(); parsedCache.clear();
+    GH.lib = { books: [] }; GH.prog = {}; GH.libSha = GH.progSha = null; GH.conf = null;
+    await Store.clear();
     connect(false);
   };
   p.querySelector('#ghForm').addEventListener('submit', async e => {
@@ -1232,6 +1330,7 @@ function openPlayer() {
   if (!synth) { toast('這個瀏覽器不支援朗讀'); return; }
   $('#player').hidden = false; $('#reader').classList.add('with-player'); document.body.classList.add('player-open');
   if (!T.voices.length) loadVoices();
+  if (!T.sleepAt && !T.stopAtChEnd && prefs.sleep && prefs.sleep !== '0') setSleep(prefs.sleep);
   if (!T.playing) ttsStart(currentBlock());
 }
 function ttsStart(b) {
@@ -1259,7 +1358,7 @@ function speakNext(g) {
   const u = new SpeechSynthesisUtterance(T.chunks[T.s]);
   const v = currentVoice();
   if (v) { u.voice = v; u.lang = v.lang; } else u.lang = 'zh-TW';
-  u.rate = prefs.rate; u.pitch = 1;
+  u.rate = prefs.rate; u.volume = prefs.volume; u.pitch = 1;
   u.onend = () => { if (g !== T.gen) return; T.errs = 0; T.s++; speakNext(g); };
   u.onerror = e => {
     if (g !== T.gen || e.error === 'interrupted' || e.error === 'canceled') return;
@@ -1391,7 +1490,11 @@ function wire() {
   $('#pTune').onclick = () => { const o = $('#pOpts'); o.hidden = !o.hidden; $('#pTune').setAttribute('aria-expanded', String(!o.hidden)); };
   $('#rateSel').onchange = e => { prefs.rate = +e.target.value; savePrefs(); if (T.playing) restartSpeech(); };
   $('#voiceSel').onchange = e => { prefs.voice = e.target.value; savePrefs(); if (T.playing) restartSpeech(); };
-  $('#sleepSel').onchange = e => setSleep(e.target.value);
+  $('#sleepSel').onchange = e => { prefs.sleep = e.target.value; savePrefs(); setSleep(e.target.value); };
+  const showVol = () => { $('#volVal').textContent = Math.round(prefs.volume * 100) + '%'; };
+  $('#volRange').value = Math.round(prefs.volume * 100); showVol();
+  $('#volRange').addEventListener('input', e => { prefs.volume = +e.target.value / 100; showVol(); });
+  $('#volRange').addEventListener('change', () => { savePrefs(); if (T.playing) restartSpeech(); });
   if (synth) { synth.cancel(); loadVoices(); if ('onvoiceschanged' in synth) synth.addEventListener('voiceschanged', loadVoices); }
 
   // 對話框
@@ -1421,7 +1524,11 @@ function wire() {
     else {
       if (T.playing) { acquireWake(); if (synth && !synth.speaking) restartSpeech(); }
       // 切回來時抓一次別台裝置的最新書架與進度
-      if (S.backend === GH && Date.now() - lastRefresh > 30000 && !cloudBusy) { lastRefresh = Date.now(); GH.refresh().catch(() => {}); }
+      if (Date.now() - lastRefresh > 30000 && !cloudBusy) {
+        lastRefresh = Date.now();
+        if (online()) GH.refresh().then(afterSync).catch(() => {});
+        else if (S.mode === 'error' && ghConf().token) connect(false);
+      }
       if (R.view === 'library' && $('#modal').hidden) renderLibrary();
     }
   });

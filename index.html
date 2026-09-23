@@ -531,7 +531,7 @@ K書吧會自動找章節，不用自己設定：
 
 耳機左邊的**設定鈕**會叫出下方的播放面板和朗讀設定（速度、語音、定時停止、音量、上一段／下一段），不會馬上開始念，按播放鍵才念；再按一次就收起。
 
-- 播放面板開著時**點任何一段**，就從那一段開始念。
+- **點任何一段**，就從那一段開始念；還沒在念時會順便叫出播放面板，正在念時只會跳到那一段。
 - 播放面板右邊的 **✕** 只是把面板收起來，朗讀會繼續；上方的耳機會亮著，點它就停，點設定鈕再把面板叫出來。
 - 可以調**速度**、**音量**、換**語音**，這些設定每台裝置各自記住，下次打開還在。iPhone／iPad 的 Safari 不理會網頁設的朗讀音量，要用手機的音量鍵調。用的是瀏覽器或系統內建的語音，Windows 上建議選名稱有「Chinese (Traditional, Taiwan)」的那個。
 - **定時停止**：15 到 60 分鐘，或念完這一章就停，適合睡前聽。選過的時間會記住，下次開始朗讀時自動套用。
@@ -1686,8 +1686,15 @@ function wire() {
     const sel = window.getSelection && String(window.getSelection());
     if (sel) return;
     const blk = e.target.closest('[data-b]');
-    // 面板開著時點段落＝從那段開始念
-    if (!$('#player').hidden && blk) ttsStart(+blk.dataset.b);
+    // 點段落＝從那段開始念（面板收著也可以）：沒在念就順便叫出播放面板，正在念就只跳段
+    if (blk && canSpeak()) {
+      if ($('#player').hidden && !T.playing) {
+        showPlayer();
+        if (NATIVE ? !$('#voiceSel').options.length : !T.voices.length) loadVoices();
+        if (!T.sleepAt && !T.stopAtChEnd && prefs.sleep && prefs.sleep !== '0') setSleep(prefs.sleep);
+      }
+      ttsStart(+blk.dataset.b);
+    }
   });
   window.addEventListener('scroll', onScroll, { passive: true });
 

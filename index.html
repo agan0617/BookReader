@@ -366,6 +366,7 @@ body.player-open .toast{bottom:calc(150px + env(safe-area-inset-bottom,0px))}
         <span class="vol-ctl"><input type="range" id="volRange" min="0" max="100" step="5" aria-label="朗讀音量"><span class="fs-val" id="volVal"></span></span>
       </label>
     </div>
+    <p class="p-hint" id="voiceNote" hidden></p>
     <p class="p-hint" id="pHint">點任何一段，就從那一段開始念。</p>
   </div>
 </section>
@@ -1435,10 +1436,33 @@ function loadVoices() {
     let list = []; try { list = JSON.parse(NATIVE.getVoices()) || []; } catch {}
     const sel = $('#voiceSel');
     const opt = v => `<option value="${esc(v.id)}">${esc(v.label)}</option>`;
-    const groups = [...new Set(list.map(v => v.group || '中文'))];
-    sel.innerHTML = '<option value="">手機預設語音</option>' +
-      groups.map(g => `<optgroup label="${esc(g)}">${list.filter(v => (v.group || '中文') === g).map(opt).join('')}</optgroup>`).join('');
+    // 依語系分組，日文排在台灣國語後面（不然要捲過二十幾個中文聲音才看得到）
+    const GROUPS = ['中文（台灣）', '日文', '中文（中國）', '粵語', '其他中文'];
+    const groupOf = v => {
+      const l = String(v.lang || '').toLowerCase();
+      if (l.startsWith('ja')) return '日文';
+      if (l.startsWith('yue') || /-hk\b/.test(l)) return '粵語';
+      if (/-tw\b|hant/.test(l)) return '中文（台灣）';
+      if (/-cn\b|hans/.test(l)) return '中文（中國）';
+      return '其他中文';
+    };
+    sel.innerHTML = '<option value="">手機預設語音</option>' + GROUPS.map(g => {
+      const vs = list.filter(v => groupOf(v) === g);
+      return vs.length ? `<optgroup label="${esc(g)}">${vs.map(opt).join('')}</optgroup>` : '';
+    }).join('');
     sel.value = list.some(v => v.id === prefs.voice) ? prefs.voice : '';
+    // 清單裡沒有日文：說明是 App 太舊還是手機的語音引擎沒有日文
+    const note = $('#voiceNote');
+    if (list.some(v => groupOf(v) === '日文')) note.hidden = true;
+    else {
+      let ver = ''; try { ver = NATIVE.version ? NATIVE.version() : ''; } catch {}
+      let eng = ''; try { eng = JSON.parse(NATIVE.engine ? NATIVE.engine() : '{}').engine || ''; } catch {}
+      note.textContent = (!ver || ver < '1.2')
+        ? `沒有日文語音：目前的 App 是 ${ver || '舊'} 版，請安裝 K書吧 1.2 以上。`
+        : `沒有日文語音：這支手機的語音引擎（${eng || '未知'}）沒有提供日文。請到 Play 商店安裝或更新「Google 語音服務」，再到「設定 → 其他設定 → 語言與輸入法 → 文字轉語音輸出」把偏好的引擎設成 Google。`;
+      // 1.2 以上但清單還是空的＝語音引擎還沒準備好，等 voices 事件再來判斷
+      note.hidden = !list.length && ver >= '1.2';
+    }
     return;
   }
   if (!synth) return;

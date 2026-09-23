@@ -1183,7 +1183,10 @@ async function openBook(id, startAt) {
   const p = startAt || getProgress(book.id);
   const ch = p ? Math.min(Math.max(0, p.ch | 0), R.chapters.length - 1) : 0;
   renderToc();
-  openChapter(ch, { block: p && (p.ch | 0) === ch ? (p.b | 0) : 0 });
+  const startBlock = p && (p.ch | 0) === ch ? (p.b | 0) : 0;
+  openChapter(ch, { block: startBlock });
+  // 朗讀位置對到這本書的起點；上一本書切好的句子快取一定要清掉，不然耳機／通知欄按播放會先把上一本的句子念出來
+  T.b = startBlock; T.s = 0; T.chunks = null;
   // App 裡：這本書如果還在背景念（例如從通知欄點回來），直接接上播放面板與位置
   if (NATIVE) {
     const st = nativeState();
@@ -1203,6 +1206,8 @@ function openChapter(i, { block = 0 } = {}) {
   R.silent = silentFlags(R.blocks);
   // 會念出來的段落編號（跳掉參考資料、程式碼這些不念的）：進度列和「第 x / n 段」只算這些
   R.spoken = R.blocks.map((_, k) => k).filter(k => blockText(k));
+  // 段落換了一批，切好的句子快取就失效（speakNext 會依 T.b 重切）
+  T.s = 0; T.chunks = null;
   $('#rChap').textContent = c.title;
   $('#chPos').textContent = `第 ${i + 1} / ${R.chapters.length} 章`;
   $('#btnPrev').disabled = $('#btnPrevCh').disabled = i === 0;
@@ -1667,6 +1672,7 @@ function ttsToggle() {
 }
 function ttsStop() {
   if (!canSpeak()) return;
+  T.b = 0; T.s = 0; T.chunks = null;
   if (NATIVE) { setSleep('0'); NATIVE.stop(); T.playing = false; clearSpeaking(); hidePlayer(); updatePlayer(); return; }
   ttsPause(); clearSpeaking(); setSleep('0');
   hidePlayer();

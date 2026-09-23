@@ -1675,8 +1675,10 @@ function ttsStop() {
 function hidePlayer() {
   $('#player').hidden = true; $('#reader').classList.remove('with-player'); document.body.classList.remove('player-open');
 }
+// App 的朗讀服務手上是不是這本書（網頁重載過、或服務被系統收掉再起來時可能不是）；不是就整本重送，免得跳到別本書的段落
+const nativeHasBook = () => { const st = nativeState(); return !!(st.active && R.book && st.bookId === R.book.id); };
 function ttsJump(delta) {
-  if (NATIVE) { NATIVE.jump(delta); return; }
+  if (NATIVE) { if (nativeHasBook()) NATIVE.jump(delta); else ttsStart(T.b + delta); return; }
   T.b = Math.max(0, Math.min(R.blocks.length - 1, T.b + delta)); T.s = 0; T.chunks = null;
   if (T.playing) restartSpeech(); else { markSpeaking(T.b); updatePlayer(); }
 }
@@ -1684,7 +1686,7 @@ function ttsJump(delta) {
 function ttsSeek(b) {
   b = Math.max(0, Math.min(R.blocks.length - 1, b | 0));
   T.b = b; T.s = 0; T.chunks = null;
-  if (NATIVE) { markSpeaking(b); NATIVE.seek(R.ch, b); updatePlayer(); return; }
+  if (NATIVE) { markSpeaking(b); if (nativeHasBook()) NATIVE.seek(R.ch, b); else nativeStart(b); updatePlayer(); return; }
   if (T.playing) restartSpeech(); else { markSpeaking(b); updatePlayer(); }
 }
 // 下方被播放面板、進度列佔掉的高度

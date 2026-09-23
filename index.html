@@ -1434,7 +1434,10 @@ function loadVoices() {
   if (NATIVE) {
     let list = []; try { list = JSON.parse(NATIVE.getVoices()) || []; } catch {}
     const sel = $('#voiceSel');
-    sel.innerHTML = '<option value="">手機預設語音</option>' + list.map(v => `<option value="${esc(v.id)}">${esc(v.label)}</option>`).join('');
+    const opt = v => `<option value="${esc(v.id)}">${esc(v.label)}</option>`;
+    const groups = [...new Set(list.map(v => v.group || '中文'))];
+    sel.innerHTML = '<option value="">手機預設語音</option>' +
+      groups.map(g => `<optgroup label="${esc(g)}">${list.filter(v => (v.group || '中文') === g).map(opt).join('')}</optgroup>`).join('');
     sel.value = list.some(v => v.id === prefs.voice) ? prefs.voice : '';
     return;
   }

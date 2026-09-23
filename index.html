@@ -1193,6 +1193,8 @@ function openChapter(i, { block = 0 } = {}) {
   R.blocks = $$('h1,h2,h3,h4,h5,h6,p,li,pre,blockquote,tr', art).filter(el => !el.querySelector('p,li,pre,tr,h1,h2,h3,h4,h5,h6'));
   R.blocks.forEach((el, k) => { el.dataset.b = k; });
   R.silent = silentFlags(R.blocks);
+  // 會念出來的段落編號（跳掉參考資料、程式碼這些不念的）：進度列和「第 x / n 段」只算這些
+  R.spoken = R.blocks.map((_, k) => k).filter(k => blockText(k));
   $('#rChap').textContent = c.title;
   $('#chPos').textContent = `第 ${i + 1} / ${R.chapters.length} 章`;
   $('#btnPrev').disabled = i === 0;
@@ -1701,18 +1703,20 @@ function updatePlayer() {
   $('#btnTts').setAttribute('aria-label', T.playing ? '朗讀中，點一下停止' : '朗讀');
   updateMediaSession();
   $('#pTitle').textContent = (R.chapters[R.ch] && R.chapters[R.ch].title) || '';
-  let sub = R.blocks.length ? `第 ${Math.min(T.b + 1, R.blocks.length)} / ${R.blocks.length} 段` : '';
+  const sp = R.spoken || [];
+  let k = sp.findIndex(i => i >= T.b); if (k < 0) k = sp.length - 1;
+  let sub = sp.length ? `第 ${k + 1} / ${sp.length} 段` : '';
   if (T.sleepAt) { const m = Math.max(0, Math.ceil((T.sleepAt - Date.now()) / 60000)); sub += ` · ${m} 分鐘後停止`; }
   else if (T.stopAtChEnd) sub += ' · 念完這章停止';
   if (!T.playing) sub += ' · 已暫停';
   $('#pSub').textContent = sub;
   // 進度列：只在念的時候顯示；拖拉中不要把把手拉回去
-  const on = T.playing && R.view === 'reader' && R.blocks.length > 0;
+  const on = T.playing && R.view === 'reader' && sp.length > 0;
   $('#ttsBar').hidden = !on; document.body.classList.toggle('ttsbar-on', on);
   if (on && !T.seeking) {
-    const s = $('#seekRange'), cur = Math.min(T.b, R.blocks.length - 1);
-    s.max = R.blocks.length - 1; s.value = cur;
-    $('#seekPos').textContent = `${cur + 1} / ${R.blocks.length}`;
+    const s = $('#seekRange');
+    s.max = sp.length - 1; s.value = k;
+    $('#seekPos').textContent = `${k + 1} / ${sp.length}`;
   }
 }
 function setSleep(v) {
@@ -1779,8 +1783,8 @@ function wire() {
   // 進度列左邊的朗讀設定鈕：叫出播放面板並展開設定；已經開著就收起
   $('#btnTtsSet').onclick = () => { if (!$('#player').hidden && !$('#pOpts').hidden) hidePlayer(); else showPlayerSettings(); };
   // 進度列：拖的時候只更新數字，放開才跳段
-  $('#seekRange').addEventListener('input', e => { T.seeking = true; $('#seekPos').textContent = `${+e.target.value + 1} / ${R.blocks.length}`; });
-  $('#seekRange').addEventListener('change', e => { T.seeking = false; ttsSeek(+e.target.value); });
+  $('#seekRange').addEventListener('input', e => { T.seeking = true; $('#seekPos').textContent = `${+e.target.value + 1} / ${(R.spoken || []).length}`; });
+  $('#seekRange').addEventListener('change', e => { T.seeking = false; const sp = R.spoken || []; ttsSeek(sp.length ? sp[Math.min(+e.target.value, sp.length - 1)] : 0); });
   $('#scrim').onclick = closePanels;
   $('#btnPrev').onclick = () => goChapter(R.ch - 1);
   $('#btnNext').onclick = () => goChapter(R.ch + 1);

@@ -240,6 +240,11 @@ input[type="range"]{width:100%;accent-color:var(--accent)}
 .vol-ctl{display:grid;grid-template-columns:1fr auto;align-items:center;gap:10px;min-height:36px}
 @media (max-width:560px){.p-opts{grid-template-columns:1fr 1fr}.p-opts .voice{grid-column:1/-1;order:-1}}
 .p-hint{margin:8px 0 0;font-size:12px;color:var(--faint)}
+.p-opts .pron-btn{grid-column:span 2;align-self:end;justify-self:start;min-height:36px}
+/* 選取文字時浮在下方的「修正讀音」鈕；位置由程式依播放面板、進度列的高度調 */
+.pron-chip{position:fixed;left:50%;transform:translateX(-50%);z-index:34;max-width:calc(100% - 32px);padding:10px 18px;border:0;border-radius:999px;background:var(--accent);color:var(--accent-ink);font-size:14px;box-shadow:var(--shadow);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.panel textarea.pron-list{min-height:7.5em;font-size:14px}
+.panel .seg button:disabled{opacity:.45}
 
 /* 朗讀進度列：念的時候常駐在最下方，停了就收。左邊設定鈕、中間這一章的進度（拖到哪段就從哪段念）、右邊音量 */
 :root{--ttsbar-h:calc(60px + env(safe-area-inset-bottom,0px))}
@@ -412,6 +417,12 @@ body.ttsbar-on.player-open .toast{bottom:calc(150px + var(--ttsbar-h))}
       <label class="vol">音量
         <span class="vol-ctl"><input type="range" id="volRange" min="0" max="100" step="5" aria-label="朗讀音量"><span class="fs-val" id="volVal"></span></span>
       </label>
+      <label>括號裡的補充
+        <select id="parenSel">
+          <option value="read">照念</option><option value="gloss">英文注解不念</option><option value="skip">都不念</option>
+        </select>
+      </label>
+      <button class="btn pron-btn" type="button" id="btnPron">讀音字典…</button>
     </div>
     <p class="p-hint" id="voiceNote" hidden></p>
     <p class="p-hint" id="pHint">點任何一段，就從那一段開始念。</p>
@@ -429,6 +440,7 @@ body.ttsbar-on.player-open .toast{bottom:calc(150px + var(--ttsbar-h))}
   </div>
 </div>
 
+<button class="pron-chip" id="pronChip" type="button" hidden></button>
 <div class="modal" id="modal" hidden><div class="panel" id="modalPanel" role="dialog" aria-modal="true"></div></div>
 <div class="drop-hint" id="dropHint" hidden>放開就加入書架</div>
 <div class="toast" id="toast" role="status" hidden></div>
@@ -521,7 +533,7 @@ const FONTS = {
 };
 const WIDTHS = { s: '30em', m: '38em', l: '48em' };
 const storedPrefs = LS.get('prefs', null);
-const prefs = Object.assign({ fs: matchMedia('(max-width: 600px)').matches ? 19 : 21, lh: 1.9, font: 'serif', theme: 'auto', width: 'm', indent: true, rate: 1, voice: '', volume: 1, sleep: '0', sort: 'recent', tag: '' }, storedPrefs || {});
+const prefs = Object.assign({ fs: matchMedia('(max-width: 600px)').matches ? 19 : 21, lh: 1.9, font: 'serif', theme: 'auto', width: 'm', indent: true, rate: 1, voice: '', volume: 1, sleep: '0', sort: 'recent', tag: '', paren: 'gloss' }, storedPrefs || {});
 const savePrefs = () => LS.set('prefs', prefs);
 
 /* ───────── 內建說明書 ───────── */
@@ -536,6 +548,7 @@ K書吧讀的是純文字書檔：**.md**（Markdown）或 **.txt**。叫 AI 寫
 - **拖進視窗**：電腦上直接把檔案拖到書架上。
 - **同名的書**：再匯入一次同書名的檔案，可以選「取代舊版」，閱讀進度會保留。書改版重寫時用這個。
 - **標籤**：書檔開頭的 frontmatter 寫一行「tags: 遊戲, 日本史」，匯入後書架標題下會多一排標籤，點一個就只看那一類的書（再點一次回到全部）。沒寫的書按書卡的「⋯」→ 編輯，在「標籤」欄用逗號分隔填。
+- **讀音**：frontmatter 裡的「pronounce:」列出朗讀容易念錯的詞，格式見〈給 AI 的格式〉。只影響朗讀，畫面上照樣是原文。
 - 也可以直接請 Claude 把寫好的書放上書架。
 
 書在兩個地方各有一份：**每台裝置的瀏覽器裡**一份，**你的私有 GitHub repo** BookShelf 一份。每次打開K書吧，會先擺出這台裝置上的書，再跟 GitHub 比對：有新書就下載、改版就更新、別台裝置刪掉的就移除。所以沒網路也能讀已經下載的書，打開也比較快。
@@ -573,8 +586,19 @@ K書吧會自動找章節，不用自己設定：
 ~~~
 請用 Markdown 輸出整本書：
 第一行寫「# 書名」，第二行寫「作者：○○」。
-每一章用「## 第一章 章名」開頭。
+每一章用「## 第一章 章名」開頭，章裡的小節用「### 小節名」。
 段落之間空一行，不要用表格。
+對話用「」。
+書名、續作編號用中文數字（星海爭霸二，不寫 II），倍數寫「2.5 倍」不寫「2.5×」。
+
+另外，這本書會用語音朗讀。請在最前面加一段 frontmatter，
+列出語音引擎可能念錯的詞（人名、地名、專有名詞、多音字），
+左邊是原文，右邊是讀音相同、但不會念錯的同音字寫法；要寫整個詞，不要只寫單一個字：
+---
+pronounce:
+  薩爾那加: 撒爾那加
+  重新: 蟲新
+---
 ~~~
 
 ## 閱讀設定
@@ -601,7 +625,11 @@ K書吧會自動找章節，不用自己設定：
 - 可以調**速度**、**音量**、換**語音**，這些設定每台裝置各自記住，下次打開還在。iPhone／iPad 的 Safari 不理會網頁設的朗讀音量，要用手機的音量鍵調。用的是瀏覽器或系統內建的語音，Windows 上建議選名稱有「Chinese (Traditional, Taiwan)」的那個。
 - **定時停止**：15 到 60 分鐘，或念完這一章就停，適合睡前聽。選過的時間會記住，下次開始朗讀時自動套用。
 - 朗讀會**跳過程式碼區塊**，以及標題叫「參考資料」「參考文獻」「References」這類的整節（到下一個同級標題為止），正文裡的網址和 [4] 這種出處編號也不念；畫面上照樣看得到。
-- 念到**章名、小節標題**時，前後會各停一下、念得慢一點，聽得出那是標題不是內文（App 要 1.4 以上）。
+- 念到**章名、小節標題**時，前後會各停一下、念得慢一點，聽得出那是標題不是內文；換段也會停一下，換章停最久，對話前後會留個空（App 要 1.5 以上，1.4 只有標題停頓）。語速調快時停頓跟著縮短。
+- **念錯字了**：選取念錯的詞，下方會出現「修正讀音」，輸入同音字（例如「重新」寫成「蟲新」），可以先**試聽**，再選「這本書」或「所有書」。畫面上照樣是原文，只有朗讀會換；正在念的話，存好會從這一段重新念。只選一個字會提醒你：那個字在書裡每次出現都會被換掉，最好選整個詞。
+- **讀音字典**：朗讀設定裡的「讀音字典…」可以一次看、一次改所有條目；書卡「⋯」→ 編輯也有這本書的讀音欄。書檔 frontmatter 的「pronounce:」也算，同一個詞以網頁上改的為準。字典存在書架上，每台裝置都一樣。
+- **符號和數字**：破折號、刪節號念成停頓；「2.5×」念「2.5 倍」、「3×4」念「3 乘 4」、「3～5」念「3 到 5」；「II」「IV」這類羅馬數字念成中文數字；「網頁／App」的斜線念成停頓。
+- **括號裡的補充**：朗讀設定可以選照念、只跳過英文注解（例如「伺服器（server）」不念括號，預設）、或括號都不念。
 - 朗讀時會盡量讓螢幕保持亮著。切到別的 App 或鎖定螢幕時，K書吧 會設法讓朗讀繼續，通知欄和鎖定畫面也有播放、暫停、上一段／下一段的按鈕；不過有些手機的瀏覽器還是會把朗讀停掉，回到 K書吧 就會接著念。
 - **Android 上想關螢幕聽書**：用 K書吧 App。App 裡的朗讀交給手機的語音引擎，切 App、鎖螢幕都會繼續念；語音清單是手機裝的語音。App 的瀏覽器資料跟 Chrome 分開，第一次打開要再貼一次 token。
 
@@ -623,15 +651,74 @@ function parseBook(text, format) {
   const meta = {};
   const fm = text.match(/^---\n([\s\S]*?)\n---\n/);
   if (fm) {
+    let inPron = false; // pronounce: 底下縮排的每一行是一條讀音
     fm[1].split('\n').forEach(l => {
+      if (inPron && /^\s+\S|^\s*-\s/.test(l)) { const p = pronPair(l); if (p) meta.pronounce[p[0]] = p[1]; return; }
+      inPron = false;
       const m = l.match(/^\s*([A-Za-z]+)\s*:\s*(.*)$/);
-      if (m) meta[m[1].toLowerCase()] = m[2].trim().replace(/^["']|["']$/g, '');
+      if (!m) return;
+      const k = m[1].toLowerCase();
+      if (k === 'pronounce') {
+        // 也接受寫成一行：pronounce: 薩爾那加=撒爾那加, 凱莉根=凱麗根
+        meta.pronounce = {}; inPron = true;
+        m[2].split(/[,，;；]/).forEach(x => { const p = pronPair(x); if (p) meta.pronounce[p[0]] = p[1]; });
+        return;
+      }
+      meta[k] = m[2].trim().replace(/^["']|["']$/g, '');
     });
     text = text.slice(fm[0].length);
   }
   let chapters = (format === 'md' && hasMarked()) ? parseMd(text, meta) : parseTxt(text, meta, format === 'md');
   if (!chapters.length) chapters = [{ title: '（空白）', render: () => '<p>這本書沒有內容。</p>' }];
   return { meta, chapters };
+}
+
+/* ───────── 讀音字典 ─────────
+   朗讀前把念錯的詞換成同音字，畫面上照樣是原文。三層，後面的蓋前面：
+   所有書共用（library.json 的 pronounce）→ 書檔 frontmatter 的 pronounce → 這本書在網頁上修的（書目的 pronounce）。
+   念法跟原文一樣＝這條不換（用來取消 frontmatter 或共用字典裡的某一條）。 */
+const PRON_SEP = /\s*(?:=|＝|→|->|：|:)\s*/;
+function pronPair(line) {
+  const s = String(line).replace(/^\s*-\s*/, '').trim();
+  if (!s || s[0] === '#') return null;
+  const m = s.split(PRON_SEP);
+  if (m.length < 2) return null;
+  const unq = x => x.trim().replace(/^["'「]|["'」]$/g, '').trim();
+  const k = unq(m[0]).slice(0, 30), v = unq(m.slice(1).join('')).slice(0, 60);
+  return k && v ? [k, v] : null;
+}
+function normPron(o) {
+  const out = {};
+  if (o && typeof o === 'object' && !Array.isArray(o)) for (const [k, v] of Object.entries(o)) {
+    const a = String(k).trim().slice(0, 30), b = String(v ?? '').trim().slice(0, 60);
+    if (a && b) out[a] = b;
+  }
+  return out;
+}
+const pronFromText = s => { const o = {}; String(s || '').split('\n').forEach(l => { const p = pronPair(l); if (p) o[p[0]] = p[1]; }); return o; };
+const pronToText = o => Object.entries(o).map(([k, v]) => `${k} = ${v}`).join('\n');
+const reEsc = s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+// 長的詞先換：「凱莉根」跟「莉根」都在字典裡時，先換掉「凱莉根」
+function compilePron(dict) {
+  const keys = Object.keys(dict).filter(k => dict[k] !== k).sort((a, b) => b.length - a.length);
+  if (!keys.length) return s => s;
+  const re = new RegExp(keys.map(reEsc).join('|'), 'g');
+  return s => s.replace(re, m => dict[m]);
+}
+const globalPron = () => normPron(GH.lib && GH.lib.pronounce);
+const bookEdits = id => normPron((S.books.find(b => b.id === id) || {}).pronounce);
+const fmPron = id => normPron(((parsedCache.get(id) || {}).meta || {}).pronounce);
+// 這本書自己的字典（不含共用的）：frontmatter ＋ 網頁上修的
+const bookPron = id => Object.assign(fmPron(id), bookEdits(id));
+function refreshPron() {
+  R.pron = !R.book ? (s => s) : compilePron(Object.assign(globalPron(), R.book.builtin ? {} : bookPron(R.book.id)));
+}
+// 網頁上修的要存成「跟 frontmatter 不一樣的部分」：frontmatter 有、這裡刪掉的記成「念原文」
+function editsFor(id, dict) {
+  const fm = fmPron(id), out = {};
+  for (const [k, v] of Object.entries(dict)) if (fm[k] !== v) out[k] = v;
+  for (const k of Object.keys(fm)) if (!(k in dict)) out[k] = k;
+  return out;
 }
 
 function mdChapter(title, toks, links) {
@@ -823,6 +910,7 @@ const GH = {
       const old = new Map(S.books.map(b => [b.id, b.updatedAt]));
       this.lib = data; this.libSha = sha; S.books = data.books.map(b => Object.assign({}, b));
       S.books.forEach(b => { if (old.has(b.id) && old.get(b.id) !== b.updatedAt) textCache.delete(b.id); });
+      if (R.book) refreshPron(); // 讀音字典在書目裡，別台裝置改了也跟著換（下一段起生效）
     } else { this.prog = data; this.progSha = sha; S.progress = Object.assign({}, data); }
     if (!fromCache) Store.set(kind, { data, sha });
     emit();
@@ -1240,6 +1328,7 @@ function editDialog(book) {
       <label for="eTitle">書名</label><input type="text" id="eTitle" value="${esc(book.title)}" required>
       <label for="eAuthor">作者</label><input type="text" id="eAuthor" value="${esc(book.author || '')}">
       <label for="eTags">標籤</label><input type="text" id="eTags" value="${esc(bookTags(book).join(', '))}" placeholder="用逗號分隔，例：遊戲, 日本史">
+      <label for="ePron">讀音（只有朗讀會換，一行一條）</label><textarea id="ePron" class="pron-list" disabled placeholder="正在讀取…"></textarea>
       <p class="hint">${fmtChars(book.chars)} · ${book.chapters || 0} 章 · ${book.format === 'txt' ? '純文字' : 'Markdown'} · 加入於 ${new Date(book.addedAt || Date.now()).toLocaleDateString('zh-TW')}</p>
       <div class="actions"><button class="btn danger left" type="button" data-del>刪除這本</button><button class="btn" type="button" data-x>取消</button><button class="btn primary" type="submit">儲存</button></div>
     </form>`);
@@ -1250,13 +1339,158 @@ function editDialog(book) {
     if (c !== 'del') return;
     try { await S.backend.remove(book); toast(`已刪除《${book.title}》`); } catch (e) { toast(errMsg(e), 5000); }
   };
+  // 讀音要先讀書檔（frontmatter 裡的那幾條也列出來一起改）；讀不到就不能改這欄，免得把 frontmatter 的條目當成刪掉
+  let pronReady = false;
+  ensureParsed(book).then(() => {
+    const ta = p.querySelector('#ePron'); if (!ta) return;
+    ta.value = pronToText(bookPron(book.id)); ta.disabled = false; pronReady = true;
+    ta.placeholder = '薩爾那加 = 撒爾那加\n重新 = 蟲新';
+  }).catch(() => { const ta = p.querySelector('#ePron'); if (ta) ta.placeholder = '書檔還沒下載到這台裝置，連上書架後再改'; });
   p.querySelector('#editForm').addEventListener('submit', async e => {
     e.preventDefault();
     const title = $('#eTitle').value.trim().slice(0, 120), author = $('#eAuthor').value.trim().slice(0, 80), tags = normTags($('#eTags').value);
     if (!title) return;
+    const patch = { title, author, tags };
+    if (pronReady) { const d = editsFor(book.id, pronFromText($('#ePron').value)); patch.pronounce = Object.keys(d).length ? d : undefined; }
     closeModal();
-    try { await S.backend.update(book.id, { title, author, tags }); toast('已儲存'); } catch (err) { toast(errMsg(err), 5000); }
+    try { await S.backend.update(book.id, patch); toast('已儲存'); } catch (err) { toast(errMsg(err), 5000); }
   });
+}
+
+/* ───────── 修正讀音（閱讀時選取文字） ─────────
+   開對話框時正在念就先暫停，關掉後從同一段接著念，改過的讀音馬上聽得到 */
+function pausedWhile(open) {
+  const was = T.playing; if (was) ttsPause();
+  const resume = () => { if (was && R.view === 'reader') ttsStart(T.b); };
+  open(resume);
+  modalResolve = resume; // 取消、按 Esc、點外面關掉時也接著念
+}
+// 讀音字典改了（或括號設定改了）：之後念的都照新規則，正在念的從這一段重新排
+function speechRulesChanged() {
+  refreshPron();
+  if (R.view === 'reader') R.spoken = R.blocks.map((_, k) => k).filter(k => blockText(k));
+  T.s = 0; T.chunks = null;
+  if (T.playing) { if (NATIVE) ttsStart(T.b); else restartSpeech(); }
+}
+const canPreview = () => NATIVE ? typeof NATIVE.preview === 'function' : !!synth;
+function previewSay(text) {
+  const t = speakable(text); if (!t) return;
+  if (NATIVE) { try { NATIVE.preview(t, prefs.voice || '', prefs.rate, prefs.volume); } catch {} return; }
+  if (!T.voices.length) loadVoices();
+  synth.cancel();
+  const u = new SpeechSynthesisUtterance(t), v = currentVoice();
+  if (v) { u.voice = v; u.lang = v.lang; } else u.lang = 'zh-TW';
+  u.rate = prefs.rate; u.volume = prefs.volume; synth.speak(u);
+}
+// 存一條讀音。say 是 null（或跟原文一樣）＝改回念原文；scope：'book' 這本書、'all' 所有書
+async function savePron(word, say, scope) {
+  if (say === word) say = null;
+  const id = R.book && !R.book.builtin ? R.book.id : null, title = R.book ? R.book.title : '';
+  if (!id) scope = 'all';
+  const fmHas = id ? word in fmPron(id) : false;
+  await GH.mutate('lib', lib => {
+    const all = normPron(lib.pronounce);
+    if (scope === 'all') { if (say == null) delete all[word]; else all[word] = say; }
+    if (Object.keys(all).length) lib.pronounce = all; else delete lib.pronounce;
+    const b = id && lib.books.find(x => x.id === id);
+    if (b) {
+      const d = normPron(b.pronounce);
+      // 這本書的條目蓋過共用的：存成所有書時，只有 frontmatter 也寫了這個詞才要在這本書記一筆，不然 frontmatter 那條會蓋掉
+      if (scope === 'all') { if (fmHas) d[word] = say == null ? word : say; else delete d[word]; }
+      else if (say != null) d[word] = say;
+      else if (fmHas || word in all) d[word] = word;
+      else delete d[word];
+      if (Object.keys(d).length) b.pronounce = d; else delete b.pronounce;
+    }
+    return lib;
+  }, `讀音：「${word}」${say == null ? '念原文' : '念成「' + say + '」'}（${scope === 'all' ? '所有書' : '《' + title + '》'}）`);
+}
+function pronDialog(word) {
+  if (!canWrite()) { toast('要連上書架（右上角顯示「已同步」）才能存讀音', 4000); return; }
+  const builtin = !R.book || R.book.builtin;
+  const mine = builtin ? {} : bookPron(R.book.id), all = globalPron();
+  const inBook = word in mine && mine[word] !== word, inAll = word in all && all[word] !== word && !(word in mine);
+  let scope = builtin || (!inBook && inAll) ? 'all' : 'book';
+  const cur = inBook ? mine[word] : inAll ? all[word] : '';
+  pausedWhile(resume => {
+    const p = openModal(`<h3>「${esc(word)}」怎麼念？</h3>
+      <form id="pronForm">
+        <label for="pronSay">念成（用同音字寫）</label>
+        <input type="text" id="pronSay" value="${esc(cur || word)}" autocomplete="off" autofocus>
+        <p class="hint">例如「薩爾那加」寫成「撒爾那加」、「重新」寫成「蟲新」。畫面上照樣是原文，只有朗讀會換。${word.length === 1 ? `<br><b>只選了一個字</b>：書裡每個「${esc(word)}」都會被換掉，建議選整個詞（例如選「重新」而不是「重」）。` : ''}</p>
+        <label>套用到</label>
+        <div class="seg" id="pronScope"><button type="button" data-v="book"${builtin ? ' disabled' : ''}>這本書</button><button type="button" data-v="all">所有書</button></div>
+        <div class="actions">
+          ${canPreview() ? '<button class="btn left" type="button" data-try>試聽</button>' : ''}
+          ${cur ? '<button class="btn" type="button" data-rm>改回原文</button>' : ''}
+          <button class="btn" type="button" data-x>取消</button><button class="btn primary" type="submit">儲存</button>
+        </div>
+      </form>`);
+    const seg = () => p.querySelectorAll('#pronScope [data-v]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.v === scope)));
+    seg();
+    p.querySelector('#pronScope').addEventListener('click', e => { const b = e.target.closest('[data-v]'); if (b && !b.disabled) { scope = b.dataset.v; seg(); } });
+    const tryBtn = p.querySelector('[data-try]'); if (tryBtn) tryBtn.onclick = () => previewSay(p.querySelector('#pronSay').value.trim() || word);
+    p.querySelector('[data-x]').onclick = closeModal;
+    const save = async say => {
+      modalResolve = null; closeModal();
+      try { await savePron(word, say, scope); speechRulesChanged(); toast(say == null || say === word ? `「${word}」改回念原文` : `「${word}」之後念成「${say}」`); }
+      catch (err) { toast(errMsg(err), 5000); }
+      resume();
+    };
+    const rm = p.querySelector('[data-rm]'); if (rm) rm.onclick = () => save(null);
+    p.querySelector('#pronForm').addEventListener('submit', e => { e.preventDefault(); save(p.querySelector('#pronSay').value.trim().slice(0, 60) || null); });
+  });
+}
+// 整份字典一次看、一次改：這本書的、所有書共用的
+function pronListDialog() {
+  if (!canWrite()) { toast('要連上書架（右上角顯示「已同步」）才能改讀音字典', 4000); return; }
+  const book = R.book && !R.book.builtin ? R.book : null;
+  pausedWhile(resume => {
+    const p = openModal(`<h3>讀音字典</h3>
+      <p class="m-body">朗讀時把左邊的詞念成右邊（用同音字寫），畫面上照樣是原文。一行一條，例如「薩爾那加 = 撒爾那加」。閱讀時選取文字，下方會出現「修正讀音」，也可以一條一條加。</p>
+      <form id="pronListForm">
+        ${book ? `<label for="plBook">這本書《${esc(book.title)}》</label><textarea id="plBook" class="pron-list">${esc(pronToText(bookPron(book.id)))}</textarea>` : ''}
+        <label for="plAll">所有書共用（多音字、常見念錯的詞）</label><textarea id="plAll" class="pron-list">${esc(pronToText(globalPron()))}</textarea>
+        <p class="hint">同一個詞兩邊都有時，用這本書的。${canPreview() ? '選取文字後可以先試聽。' : ''}</p>
+        <div class="actions"><button class="btn" type="button" data-x>取消</button><button class="btn primary" type="submit">儲存</button></div>
+      </form>`);
+    p.querySelector('[data-x]').onclick = closeModal;
+    p.querySelector('#pronListForm').addEventListener('submit', async e => {
+      e.preventDefault();
+      const all = pronFromText(p.querySelector('#plAll').value);
+      const mine = book ? editsFor(book.id, pronFromText(p.querySelector('#plBook').value)) : null;
+      modalResolve = null; closeModal();
+      try {
+        await GH.mutate('lib', lib => {
+          if (Object.keys(all).length) lib.pronounce = all; else delete lib.pronounce;
+          const b = book && lib.books.find(x => x.id === book.id);
+          if (b) { if (Object.keys(mine).length) b.pronounce = mine; else delete b.pronounce; }
+          return lib;
+        }, `讀音字典：${book ? '《' + book.title + '》與' : ''}所有書共用`);
+        speechRulesChanged(); toast('讀音字典已儲存');
+      } catch (err) { toast(errMsg(err), 5000); }
+      resume();
+    });
+  });
+}
+// 選取文字時在下方顯示「修正讀音」（選一到二十個字才出現）
+let pronSel = '', pronTimer = null;
+function onSelChange() {
+  clearTimeout(pronTimer);
+  pronTimer = setTimeout(() => {
+    const chip = $('#pronChip');
+    let t = '';
+    if (R.view === 'reader' && canSpeak() && $('#modal').hidden) {
+      const sel = window.getSelection && window.getSelection();
+      if (sel && sel.rangeCount && !sel.isCollapsed && $('#article').contains(sel.anchorNode)) t = String(sel).replace(/\s+/g, ' ').trim();
+    }
+    if (!t || t.length > 20) { chip.hidden = true; pronSel = ''; return; }
+    pronSel = t;
+    chip.textContent = `「${t}」念錯了？修正讀音`;
+    const inset = bottomInset();
+    chip.style.bottom = inset ? `${inset + 12}px` : 'calc(20px + env(safe-area-inset-bottom, 0px))';
+    chip.hidden = false;
+  }, 150);
 }
 
 /* ───────── 閱讀畫面 ───────── */
@@ -1274,19 +1508,13 @@ async function openBook(id, startAt) {
   $('#rBook').textContent = book.title; $('#rChap').textContent = '';
   $('#article').innerHTML = '<p class="loading">正在翻開…</p>';
   window.scrollTo(0, 0);
-  let parsed = parsedCache.get(book.id);
-  const ver = book.asset || book.updatedAt || 0;
-  if (!parsed || parsed.ver !== ver) {
-    try {
-      const text = book.builtin ? GUIDE_MD : await S.backend.text(book);
-      parsed = Object.assign(parseBook(text, book.format || 'md'), { ver });
-      parsedCache.set(book.id, parsed);
-    } catch (e) {
-      $('#article').innerHTML = `<p class="err">這本書打不開：${esc(e.message || e)}</p>`; return;
-    }
-  }
+  R.pron = null;
+  let parsed;
+  try { parsed = await ensureParsed(book); }
+  catch (e) { $('#article').innerHTML = `<p class="err">這本書打不開：${esc(e.message || e)}</p>`; return; }
   if (R.book !== book) return;
   R.chapters = parsed.chapters;
+  refreshPron();
   const p = startAt || getProgress(book.id);
   const ch = p ? Math.min(Math.max(0, p.ch | 0), R.chapters.length - 1) : 0;
   renderToc();
@@ -1301,6 +1529,17 @@ async function openBook(id, startAt) {
   }
 }
 
+async function ensureParsed(book) {
+  let parsed = parsedCache.get(book.id);
+  const ver = book.asset || book.updatedAt || 0;
+  if (!parsed || parsed.ver !== ver) {
+    const text = book.builtin ? GUIDE_MD : await S.backend.text(book);
+    parsed = Object.assign(parseBook(text, book.format || 'md'), { ver });
+    parsedCache.set(book.id, parsed);
+  }
+  return parsed;
+}
+
 function openChapter(i, { block = 0 } = {}) {
   R.ch = i;
   const c = R.chapters[i];
@@ -1311,6 +1550,7 @@ function openChapter(i, { block = 0 } = {}) {
   R.blocks = $$('h1,h2,h3,h4,h5,h6,p,li,pre,blockquote,tr', art).filter(el => !el.querySelector('p,li,pre,tr,h1,h2,h3,h4,h5,h6'));
   R.blocks.forEach((el, k) => { el.dataset.b = k; });
   R.silent = silentFlags(R.blocks);
+  R.pre = preGaps(R.blocks);
   // 會念出來的段落編號（跳掉參考資料、程式碼這些不念的）：進度列和「第 x / n 段」只算這些
   R.spoken = R.blocks.map((_, k) => k).filter(k => blockText(k));
   // 段落換了一批，切好的句子快取就失效（speakNext 會依 T.b 重切）
@@ -1338,6 +1578,7 @@ function closeReader() {
   ttsStop();
   savePos(); flushCloud();
   closePanels();
+  $('#pronChip').hidden = true;
   R.view = 'library'; R.book = null; updateMediaSession();
   $('#reader').hidden = true; $('#library').hidden = false;
   applyPrefs();
@@ -1547,10 +1788,50 @@ function silentFlags(blocks) {
 }
 // 出處編號 [4]、[9][10]、[1, 3] 也不念；前面緊貼英數字的（slice[0]）或四位數以上的（[2019]）不算
 const CITE_RE = /(?<![\w)\]])(?:\[\d{1,3}(?:\s*[,，、–-]\s*\d{1,3})*\])+/g;
-/* 標題（章名、### 小節名）念的時候前後各停一下、念慢一點，聽的人才分得出那是標題不是內文 */
-const isHead = el => /^H[1-6]$/.test(el.tagName);
-const HEAD_GAP = 700, HEAD_RATE = 0.85;
-const speechText = (el, silent) => silent ? '' : el.textContent.replace(/https?:\/\/\S+/g, ' ').replace(CITE_RE, '').replace(/\s+/g, ' ').trim();
+/* 停頓：每一段開始前停多久（毫秒，1× 語速的基準）。換段停一下，標題（章名、### 小節名）前後停久一點、
+   標題本身念慢一點，換章停最久，聽的人才分得出段落和標題。第一段（剛按播放、點段落開始念）不停 */
+const isHead = el => !!el && /^H[1-6]$/.test(el.tagName);
+const PARA_GAP = 250, HEAD_GAP = 700, CH_GAP = 1500, HEAD_RATE = 0.85;
+const preGaps = els => els.map((el, k) => k === 0 ? CH_GAP : Math.max(isHead(el) ? HEAD_GAP : PARA_GAP, isHead(els[k - 1]) ? HEAD_GAP : 0));
+// 語速快時停頓跟著縮短，但縮得比語速慢（4× 時停一半）
+const gapMs = ms => Math.round(ms / Math.sqrt(Math.max(1, prefs.rate)));
+
+/* 符號與數字整理成念得出來的樣子（只影響朗讀，畫面不變） */
+const CJK = '\\u3400-\\u9fff\\uf900-\\ufaff';
+const ROMAN = { II: '二', III: '三', IV: '四', VI: '六', VII: '七', VIII: '八', IX: '九' };
+const ROMAN_U = 'ⅠⅡⅢⅣⅤⅥⅦⅧⅨⅩ', ROMAN_ZH = '一二三四五六七八九十';
+const SPK = {
+  parenAll: /[（(][^（）()]*[)）]/g,
+  // 中文後面括號裡只有英文的注解，例如「伺服器（server）」
+  gloss: new RegExp(`(?<=[${CJK}])\\s*[（(]\\s*[A-Za-z][A-Za-z0-9 .,'’&/+\\-]*[)）]`, 'g'),
+  range: /(\d)\s*[–—~～]\s*(?=\d)/g,          // 3～5 → 3到5
+  times: /(\d)\s*[×✕xX]\s*(?=\d)/g,           // 3×4 → 3乘4
+  fold: /(\d)\s*[×✕xX](?![A-Za-z0-9])/g,      // 2.5× → 2.5倍
+  roman: /(?<![A-Za-z])(VIII|VII|III|IX|IV|VI|II)(?![A-Za-z])/g,
+  romanU: /[ⅠⅡⅢⅣⅤⅥⅦⅧⅨⅩ]/g,
+  dash: /[—―─]+|…+|\.{3,}|\s\|\s/g,          // 破折號、刪節號 → 停一下
+  slashL: new RegExp(`(?<=[${CJK}])\\s*[/／]\\s*`, 'g'),
+  slashR: new RegExp(`\\s*[/／]\\s*(?=[${CJK}])`, 'g'),
+  tilde: /[~～]/g,
+  // 對話前後留個空：他說「……」他笑了 → 他說，「……」，他笑了
+  qOpen: new RegExp(`(?<=[${CJK}A-Za-z0-9])([「『])`, 'g'),
+  qClose: new RegExp(`([」』])(?=[${CJK}A-Za-z0-9])`, 'g'),
+  dupComma: /[，,]\s*(?=[，。！？、；：])/g
+};
+function speakable(s) {
+  if (!s) return s;
+  const paren = prefs.paren || 'gloss';
+  if (paren === 'skip') s = s.replace(SPK.parenAll, '');
+  else if (paren === 'gloss') s = s.replace(SPK.gloss, '');
+  return s.replace(SPK.range, '$1到').replace(SPK.times, '$1乘').replace(SPK.fold, '$1倍')
+    .replace(SPK.roman, m => ROMAN[m]).replace(SPK.romanU, c => ROMAN_ZH[ROMAN_U.indexOf(c)])
+    .replace(SPK.dash, '，').replace(SPK.slashL, '、').replace(SPK.slashR, '、').replace(SPK.tilde, '')
+    .replace(SPK.qOpen, '，$1').replace(SPK.qClose, '$1，').replace(SPK.dupComma, '')
+    .replace(/^[，\s]+/, '').replace(/\s+/g, ' ').trim();
+}
+// 念出來的文字：去掉網址、出處編號 → 讀音字典 → 符號整理
+const rawText = el => el.textContent.replace(/https?:\/\/\S+/g, ' ').replace(CITE_RE, '').replace(/\s+/g, ' ').trim();
+const speechText = (el, silent) => silent ? '' : speakable(R.pron ? R.pron(rawText(el)) : rawText(el));
 
 function chapterBlocks(c) {
   if (!c.html) { try { c.html = sanitize(c.render()); } catch { c.html = ''; } }
@@ -1559,7 +1840,11 @@ function chapterBlocks(c) {
   const blocks = [...tpl.content.querySelectorAll('h1,h2,h3,h4,h5,h6,p,li,pre,blockquote,tr')]
     .filter(el => !el.querySelector('p,li,pre,tr,h1,h2,h3,h4,h5,h6'));
   const silent = silentFlags(blocks);
-  return { blocks: blocks.map((el, k) => speechText(el, silent[k])), heads: blocks.map((el, k) => isHead(el) ? k : -1).filter(k => k >= 0) };
+  return {
+    blocks: blocks.map((el, k) => speechText(el, silent[k])),
+    heads: blocks.map((el, k) => isHead(el) ? k : -1).filter(k => k >= 0),
+    pre: preGaps(blocks) // App 1.5 起照這個在段落前插靜音（1× 的毫秒數，App 自己依語速縮）
+  };
 }
 function nativeSleepArg() {
   if (T.stopAtChEnd) return 'ch';
@@ -1710,17 +1995,14 @@ function speakNext(g, cont) {
   }
   markSpeaking(T.b);
   const head = isHead(R.blocks[T.b]);
-  // 接著上一段念到標題：先停一下再念（剛按播放就從標題開始的不用停）
-  if (cont && head && T.s === 0) { setTimeout(() => speakNext(g), HEAD_GAP); return; }
+  // 接著上一段念到新的一段：先停一下（換段、標題前後、換章長短不同；剛按播放的那段不停）
+  const gap = cont && T.s === 0 ? gapMs((R.pre && R.pre[T.b]) || 0) : 0;
+  if (gap > 0) { setTimeout(() => speakNext(g), gap); return; }
   const u = new SpeechSynthesisUtterance(T.chunks[T.s]);
   const v = currentVoice();
   if (v) { u.voice = v; u.lang = v.lang; } else u.lang = 'zh-TW';
   u.rate = prefs.rate * (head ? HEAD_RATE : 1); u.volume = prefs.volume; u.pitch = 1;
-  u.onend = () => {
-    if (g !== T.gen) return; T.errs = 0; T.s++;
-    if (head && T.s >= T.chunks.length) setTimeout(() => speakNext(g), HEAD_GAP); // 標題念完也停一下再念內文
-    else speakNext(g, true);
-  };
+  u.onend = () => { if (g !== T.gen) return; T.errs = 0; T.s++; speakNext(g, true); };
   u.onerror = e => {
     if (g !== T.gen || e.error === 'interrupted' || e.error === 'canceled') return;
     if (++T.errs > 3) { ttsPause(); toast('朗讀出錯（' + e.error + '），換個語音試試', 5000); return; }
@@ -1976,6 +2258,14 @@ function wire() {
   $('#rateSel').onchange = e => { prefs.rate = +e.target.value; savePrefs(); if (NATIVE) NATIVE.setRate(prefs.rate); else if (T.playing) restartSpeech(); };
   $('#voiceSel').onchange = e => { prefs.voice = e.target.value; savePrefs(); if (NATIVE) NATIVE.setVoice(prefs.voice); else if (T.playing) restartSpeech(); };
   $('#sleepSel').onchange = e => { prefs.sleep = e.target.value; savePrefs(); setSleep(e.target.value); };
+  $('#parenSel').value = prefs.paren;
+  $('#parenSel').onchange = e => { prefs.paren = e.target.value; savePrefs(); speechRulesChanged(); };
+  $('#btnPron').onclick = pronListDialog;
+  // 選取文字 →「修正讀音」。按下去時選取可能已經被清掉，所以用選取當下記住的字
+  document.addEventListener('selectionchange', onSelChange);
+  const chip = $('#pronChip');
+  chip.addEventListener('pointerdown', e => e.preventDefault());
+  chip.onclick = () => { const w = pronSel; chip.hidden = true; try { window.getSelection().removeAllRanges(); } catch {} if (w) pronDialog(w); };
   // 音量拉桿有兩支（播放面板的設定裡、下方進度列右邊），拉哪一支另一支都跟著動
   const vols = [$('#volRange'), $('#volRange2')];
   const showVol = () => { const v = Math.round(prefs.volume * 100); $('#volVal').textContent = v + '%'; vols.forEach(r => { if (+r.value !== v) r.value = v; }); };

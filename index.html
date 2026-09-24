@@ -148,6 +148,10 @@ select{height:36px;padding:0 10px;border-radius:8px;border:1px solid var(--line)
 .book .pct .bar{flex:1}
 .book .last{margin-top:-4px;font-size:12px;color:var(--faint);font-variant-numeric:tabular-nums}
 .empty{grid-column:1/-1;margin:0;padding:22px;border:1.5px dashed var(--line);border-radius:12px;color:var(--muted);text-align:center;line-height:1.8}
+.ver{margin:40px 0 calc(28px + env(safe-area-inset-bottom,0px));text-align:center;font-size:12px;line-height:2;color:var(--faint);font-variant-numeric:tabular-nums}
+.ver button,.ver a{padding:0 2px;color:inherit;font:inherit;text-decoration:underline;text-underline-offset:3px}
+.ver .new{color:var(--accent);font-weight:600}
+.ver .new a,.ver .new button{color:var(--accent)}
 .drop-hint{position:fixed;inset:12px;z-index:80;border:2px dashed var(--accent);border-radius:16px;background:color-mix(in srgb,var(--bg) 88%,transparent);display:grid;place-items:center;font-family:var(--f-display);font-size:22px;color:var(--accent);pointer-events:none}
 
 /* ───── 閱讀 ───── */
@@ -310,6 +314,7 @@ body.ttsbar-on.player-open .toast{bottom:calc(150px + var(--ttsbar-h))}
     </div>
     <div class="tag-bar" id="tagBar" hidden></div>
     <div class="grid" id="grid"></div>
+    <footer class="ver" id="verLine"></footer>
   </main>
 </div>
 
@@ -451,6 +456,10 @@ body.ttsbar-on.player-open .toast{bottom:calc(150px + var(--ttsbar-h))}
 (() => {
 'use strict';
 
+/* 網頁版本：每次改這個檔案推上去都要跟著改（年.月.日，同一天第二版起加 .2、.3）。
+   書架最下面會顯示，「檢查更新」拿線上那份的這一行來比 */
+const WEB_VERSION = '2026.09.24';
+
 /* ───────── 小工具 ───────── */
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
@@ -554,6 +563,8 @@ K書吧讀的是純文字書檔：**.md**（Markdown）或 **.txt**。叫 AI 寫
 書在兩個地方各有一份：**每台裝置的瀏覽器裡**一份，**你的私有 GitHub repo** BookShelf 一份。每次打開K書吧，會先擺出這台裝置上的書，再跟 GitHub 比對：有新書就下載、改版就更新、別台裝置刪掉的就移除。所以沒網路也能讀已經下載的書，打開也比較快。
 
 **離線閱讀**：頁面本身也會存一份在裝置上（第一次上網打開時就存好），之後在沒有網路的地方——飛機上、捷運裡——直接打開K書吧或 App 一樣能讀。右上角會顯示「離線・本機書架」，這時不能匯入或刪書；讀到哪先記在本機，網路回來會自動連上並把進度補傳。手機瀏覽器可以用「加到主畫面」把K書吧裝成 App 圖示，打開更快。
+
+**版本**：書架最下面有一行小字，寫著網頁的版本（在 App 裡還有 App 的版本）。按「檢查更新」會跟線上最新的比：網頁有新版就按「重新整理」；App 有新版就按「下載」，到 GitHub 下載新的 .apk 裝上去（書架和登入都會保留）。App 裡平常每半天也會自己查一次 App 有沒有新版。
 
 閱讀進度也存在 GitHub，記成**一格一格**的：每台裝置（電腦、手機瀏覽器、手機 App）每讀到新的一章記一格，同一章只更新位置，最多留 30 格、舊的自動掉出去，所以裝置之間不會互相蓋掉。換章、回書架、離開頁面時會同步，讀同一章很久時最多每 3 分鐘存一次。
 
@@ -1770,6 +1781,64 @@ const T = { playing: false, b: 0, s: 0, chunks: null, gen: 0, utter: null, errs:
 const NATIVE = (window.KBookNative && typeof window.KBookNative.start === 'function') ? window.KBookNative : null;
 const canSpeak = () => !!(synth || NATIVE);
 
+/* ───────── 版本與更新 ─────────
+   書架最下面一行：網頁版本（WEB_VERSION）、在 App 裡再加 App 版本（KBookNative.version()）。
+   - App：打開時最多每 12 小時問一次 GitHub Releases 最新的 tag（v1.5 這種），比現在裝的新就提示下載
+   - 網頁：按「檢查更新」才抓線上的 index.html 比 WEB_VERSION（網址帶 ?ver=，sw.js 不會拿快取頂替） */
+const APP_REPO = 'agan0617/KBookBarApp';
+const appVersion = () => { try { return NATIVE && NATIVE.version ? String(NATIVE.version()) : ''; } catch { return ''; } };
+function verNewer(a, b) { // a 比 b 新？逐段比數字：1.10 > 1.9、2026.09.24.2 > 2026.09.24
+  const x = String(a).replace(/^v/i, '').split('.').map(n => parseInt(n, 10) || 0);
+  const y = String(b).replace(/^v/i, '').split('.').map(n => parseInt(n, 10) || 0);
+  for (let i = 0; i < Math.max(x.length, y.length); i++) if ((x[i] || 0) !== (y[i] || 0)) return (x[i] || 0) > (y[i] || 0);
+  return false;
+}
+const UPD = { web: '', checking: false, checkedAt: 0 };
+function renderVer() {
+  const el = $('#verLine'); if (!el) return;
+  const app = appVersion(), rel = NATIVE ? LS.get('appRel', null) : null;
+  const parts = [`網頁 ${esc(WEB_VERSION)}`];
+  if (NATIVE) parts.push(`App ${esc(app || '舊版')}`);
+  let html = `<div>${parts.join(' · ')} · <button type="button" id="verCheck"${UPD.checking ? ' disabled' : ''}>${UPD.checking ? '檢查中…' : '檢查更新'}</button></div>`;
+  if (UPD.web) html += `<div class="new">網頁有新版 ${esc(UPD.web)} · <button type="button" id="verReload">重新整理</button></div>`;
+  if (rel && verNewer(rel.tag, app || '0')) html += `<div class="new">App 有新版 ${esc(rel.tag.replace(/^v/i, ''))} · <a href="${esc(rel.url)}" target="_blank" rel="noopener">下載</a></div>`;
+  else if (UPD.checkedAt && !UPD.web) html += `<div>${NATIVE ? '網頁和 App 都是最新版' : '已經是最新版'}</div>`;
+  el.innerHTML = html;
+  $('#verCheck').onclick = () => checkUpdates(true);
+  if ($('#verReload')) $('#verReload').onclick = () => location.reload();
+}
+async function checkAppRelease() {
+  // 有書架 token 就帶上：沒帶的話同一個 IP 每小時只能問 60 次，公司、學校的網路常常早就被用完（403）
+  const url = `https://api.github.com/repos/${APP_REPO}/releases/latest`, token = ghConf().token;
+  const get = auth => fetch(url, { headers: Object.assign({ Accept: 'application/vnd.github+json' }, auth ? { Authorization: 'Bearer ' + token } : {}), cache: 'no-store' });
+  let r = await get(!!token);
+  if (r.status === 401 && token) r = await get(false); // token 過期了就不帶再試一次
+  if (!r.ok) throw new Error('release ' + r.status);
+  const j = await r.json();
+  LS.set('appRel', { tag: j.tag_name || '', url: j.html_url || `https://github.com/${APP_REPO}/releases/latest`, at: Date.now() });
+}
+async function checkWeb() {
+  const r = await fetch('index.html?ver=' + Date.now(), { cache: 'no-store' });
+  if (!r.ok) throw new Error('page ' + r.status);
+  const m = /const WEB_VERSION = '([^']+)'/.exec(await r.text());
+  UPD.web = m && verNewer(m[1], WEB_VERSION) ? m[1] : '';
+}
+async function checkUpdates(manual) {
+  if (UPD.checking) return;
+  if (!navigator.onLine) { if (manual) toast('沒有網路，連上再檢查'); return; }
+  UPD.checking = true; renderVer();
+  const jobs = [];
+  if (manual) jobs.push(checkWeb());
+  if (NATIVE) jobs.push(checkAppRelease());
+  const res = await Promise.allSettled(jobs);
+  UPD.checking = false;
+  if (manual) {
+    if (res.some(x => x.status === 'rejected')) toast('有一項沒檢查成功，等一下再試');
+    else UPD.checkedAt = Date.now();
+  }
+  renderVer();
+}
+
 /* 朗讀時不念的段落：程式碼區塊，以及「參考資料」這類標題底下整節（一路到下一個同級或更高的標題）。
    念網址和程式碼沒人聽得懂。段落照樣留在清單裡、只是文字給空字串，段落編號才不會跟畫面錯開；
    網頁的 speakNext 遇到空段落直接跳過，App 那邊空段落只會念一個全形空白。 */
@@ -1922,9 +1991,9 @@ function loadVoices() {
     const note = $('#voiceNote');
     if (list.some(v => groupOf(v) === '日文')) note.hidden = true;
     else {
-      let ver = ''; try { ver = NATIVE.version ? NATIVE.version() : ''; } catch {}
+      const ver = appVersion();
       let eng = ''; try { eng = JSON.parse(NATIVE.engine ? NATIVE.engine() : '{}').engine || ''; } catch {}
-      note.textContent = (!ver || ver < '1.2')
+      note.textContent = (!ver || verNewer('1.2', ver))
         ? `沒有日文語音：目前的 App 是 ${ver || '舊'} 版，請安裝 K書吧 1.2 以上。`
         : `沒有日文語音：這支手機的語音引擎（${eng || '未知'}）沒有提供日文。請到 Play 商店安裝或更新「Google 語音服務」，再到「設定 → 其他設定 → 語言與輸入法 → 文字轉語音輸出」把偏好的引擎設成 Google。`;
       // 1.2 以上但清單還是空的＝語音引擎還沒準備好，等 voices 事件再來判斷
@@ -2326,7 +2395,8 @@ function wire() {
 /* ───────── 啟動 ───────── */
 let lastRefresh = Date.now();
 async function init() {
-  wire(); applyPrefs(); renderLibrary();
+  wire(); applyPrefs(); renderLibrary(); renderVer();
+  if (NATIVE && Date.now() - ((LS.get('appRel', null) || {}).at || 0) > 12 * 3600e3) checkUpdates(false);
   // 離線也打得開：Service Worker（sw.js）把頁面、marked／DOMPurify、字型存在裝置上；書檔本來就在 IndexedDB。
   // 有網路時 sw 仍一律抓最新頁面，抓不到才用存的那份
   if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {

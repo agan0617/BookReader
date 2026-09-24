@@ -70,6 +70,7 @@
 - 讀音字典：選取念錯的詞 →「修正讀音」（可試聽），分這本書／所有書，存在書架上；書檔 frontmatter 的 `pronounce:` 也算。畫面照樣是原文
 - **本機副本**：每台裝置的瀏覽器用 IndexedDB 存一份完整書架（書目、書檔、進度）。打開時先顯示本機的，再跟書架 repo 比對：補下載新書與改版、清掉已下架的，沒網路也能讀
 - **離線閱讀**：`sw.js`（Service Worker）把頁面本身、marked／DOMPurify、字型存在裝置上，沒網路也打得開（有網路時一律先抓最新頁面，8 秒內抓不到才用存的）。`manifest.webmanifest` 讓手機瀏覽器可以「加到主畫面」當 PWA 用；App 的 WebView 跑的是同一支 Service Worker，所以 App 離線也能開。網路回來時自動重新連上書架、補傳進度
+- **版本**：書架最下面顯示網頁版本（`index.html` 開頭的 `WEB_VERSION`，格式「年.月.日」、同一天第二版起加 `.2`；**每次改 `index.html` 推上去都要改**），在 App 裡再加上 App 版本（`KBookNative.version()`）。「檢查更新」抓線上的 `index.html?ver=…`（`sw.js` 不經手，不會拿快取回答）比 `WEB_VERSION`；App 版本跟 [KBookBarApp 的 Releases](https://github.com/agan0617/KBookBarApp/releases) 最新 tag 比，App 裡每 12 小時自動查一次，有書架 token 就帶上避開未登入每小時 60 次的限制
 - 閱讀進度同步：換章、回書架、離開頁面時各 commit 一次到 `progress.json`；同一章讀很久時最多每 3 分鐘補存一次；離線時讀的進度下次連上時補傳。進度記成 **slot**：每台裝置每本書每一章一格、全書架最多 30 格（同一章只更新位置，舊的自動掉出去），裝置之間不會互相蓋掉；「繼續閱讀」底下可以列出所有裝置的格子挑一格接著讀
 - 朗讀設定（語音、速度、音量、定時停止）每台裝置各自記在 localStorage
 - Android 上想在背景、關螢幕也繼續朗讀，用 [K書吧 Android App](https://github.com/agan0617/KBookBarApp)（同一個網頁包成 App，朗讀改用手機語音引擎）

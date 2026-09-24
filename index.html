@@ -601,6 +601,7 @@ K書吧會自動找章節，不用自己設定：
 - 可以調**速度**、**音量**、換**語音**，這些設定每台裝置各自記住，下次打開還在。iPhone／iPad 的 Safari 不理會網頁設的朗讀音量，要用手機的音量鍵調。用的是瀏覽器或系統內建的語音，Windows 上建議選名稱有「Chinese (Traditional, Taiwan)」的那個。
 - **定時停止**：15 到 60 分鐘，或念完這一章就停，適合睡前聽。選過的時間會記住，下次開始朗讀時自動套用。
 - 朗讀會**跳過程式碼區塊**，以及標題叫「參考資料」「參考文獻」「References」這類的整節（到下一個同級標題為止），正文裡的網址和 [4] 這種出處編號也不念；畫面上照樣看得到。
+- 念到**章名、小節標題**時，前後會各停一下、念得慢一點，聽得出那是標題不是內文（App 要 1.4 以上）。
 - 朗讀時會盡量讓螢幕保持亮著。切到別的 App 或鎖定螢幕時，K書吧 會設法讓朗讀繼續，通知欄和鎖定畫面也有播放、暫停、上一段／下一段的按鈕；不過有些手機的瀏覽器還是會把朗讀停掉，回到 K書吧 就會接著念。
 - **Android 上想關螢幕聽書**：用 K書吧 App。App 裡的朗讀交給手機的語音引擎，切 App、鎖螢幕都會繼續念；語音清單是手機裝的語音。App 的瀏覽器資料跟 Chrome 分開，第一次打開要再貼一次 token。
 
@@ -1546,6 +1547,9 @@ function silentFlags(blocks) {
 }
 // 出處編號 [4]、[9][10]、[1, 3] 也不念；前面緊貼英數字的（slice[0]）或四位數以上的（[2019]）不算
 const CITE_RE = /(?<![\w)\]])(?:\[\d{1,3}(?:\s*[,，、–-]\s*\d{1,3})*\])+/g;
+/* 標題（章名、### 小節名）念的時候前後各停一下、念慢一點，聽的人才分得出那是標題不是內文 */
+const isHead = el => /^H[1-6]$/.test(el.tagName);
+const HEAD_GAP = 700, HEAD_RATE = 0.85;
 const speechText = (el, silent) => silent ? '' : el.textContent.replace(/https?:\/\/\S+/g, ' ').replace(CITE_RE, '').replace(/\s+/g, ' ').trim();
 
 function chapterBlocks(c) {
@@ -1555,7 +1559,7 @@ function chapterBlocks(c) {
   const blocks = [...tpl.content.querySelectorAll('h1,h2,h3,h4,h5,h6,p,li,pre,blockquote,tr')]
     .filter(el => !el.querySelector('p,li,pre,tr,h1,h2,h3,h4,h5,h6'));
   const silent = silentFlags(blocks);
-  return blocks.map((el, k) => speechText(el, silent[k]));
+  return { blocks: blocks.map((el, k) => speechText(el, silent[k])), heads: blocks.map((el, k) => isHead(el) ? k : -1).filter(k => k >= 0) };
 }
 function nativeSleepArg() {
   if (T.stopAtChEnd) return 'ch';
@@ -1564,7 +1568,7 @@ function nativeSleepArg() {
 function nativeStart(b) {
   NATIVE.start(JSON.stringify({
     bookId: R.book.id, bookTitle: R.book.title,
-    chapters: R.chapters.map(c => ({ title: c.title, blocks: chapterBlocks(c) })),
+    chapters: R.chapters.map(c => Object.assign({ title: c.title }, chapterBlocks(c))),
     ch: R.ch, b: Math.max(0, b), rate: prefs.rate, volume: prefs.volume, voice: prefs.voice || '', sleep: nativeSleepArg()
   }));
 }
@@ -1692,7 +1696,7 @@ function restartSpeech() {
   synth.cancel();
   setTimeout(() => { if (g === T.gen && T.playing) speakNext(g); }, 90);
 }
-function speakNext(g) {
+function speakNext(g, cont) {
   if (g !== T.gen || !T.playing) return;
   for (;;) {
     if (T.b >= R.blocks.length) {
@@ -1705,11 +1709,18 @@ function speakNext(g) {
     T.b++; T.s = 0; T.chunks = null;
   }
   markSpeaking(T.b);
+  const head = isHead(R.blocks[T.b]);
+  // 接著上一段念到標題：先停一下再念（剛按播放就從標題開始的不用停）
+  if (cont && head && T.s === 0) { setTimeout(() => speakNext(g), HEAD_GAP); return; }
   const u = new SpeechSynthesisUtterance(T.chunks[T.s]);
   const v = currentVoice();
   if (v) { u.voice = v; u.lang = v.lang; } else u.lang = 'zh-TW';
-  u.rate = prefs.rate; u.volume = prefs.volume; u.pitch = 1;
-  u.onend = () => { if (g !== T.gen) return; T.errs = 0; T.s++; speakNext(g); };
+  u.rate = prefs.rate * (head ? HEAD_RATE : 1); u.volume = prefs.volume; u.pitch = 1;
+  u.onend = () => {
+    if (g !== T.gen) return; T.errs = 0; T.s++;
+    if (head && T.s >= T.chunks.length) setTimeout(() => speakNext(g), HEAD_GAP); // 標題念完也停一下再念內文
+    else speakNext(g, true);
+  };
   u.onerror = e => {
     if (g !== T.gen || e.error === 'interrupted' || e.error === 'canceled') return;
     if (++T.errs > 3) { ttsPause(); toast('朗讀出錯（' + e.error + '），換個語音試試', 5000); return; }

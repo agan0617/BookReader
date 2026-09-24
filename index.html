@@ -115,6 +115,10 @@ button.chip:hover{border-color:var(--faint)}
 
 .shelf-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:30px 0 16px}
 .shelf-head h2{margin:0;font-family:var(--f-display);font-size:17px;font-weight:600;letter-spacing:.18em}
+.shelf-tools{display:flex;align-items:center;gap:8px;min-width:0}
+.view-btn{width:36px;height:36px;flex:none;display:grid;place-items:center;border-radius:8px;border:1px solid var(--line);background:var(--raised);color:var(--muted)}
+.view-btn:hover{border-color:var(--faint);color:var(--ink)}
+.view-btn svg{width:18px;height:18px}
 .tag-bar{display:flex;gap:8px;margin:-6px 0 18px;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch}
 .tag-bar::-webkit-scrollbar{display:none}
 .tag-bar .chip{flex:none;cursor:pointer;color:var(--ink);white-space:nowrap;font-variant-numeric:tabular-nums}
@@ -147,6 +151,23 @@ select{height:36px;padding:0 10px;border-radius:8px;border:1px solid var(--line)
 .book .pct{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--faint);font-variant-numeric:tabular-nums}
 .book .pct .bar{flex:1}
 .book .last{margin-top:-4px;font-size:12px;color:var(--faint);font-variant-numeric:tabular-nums}
+/* 清單模式：每本一列。左邊縮小版書封（只留顏色、書脊、標籤）、中間書名／字數／進度、右邊「⋯」；整列（除了「⋯」）都是開書的按鈕 */
+.grid.list{grid-template-columns:1fr;gap:8px}
+.brow{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:2px;padding:10px 6px 10px 12px;background:var(--raised);border:1px solid var(--line);border-radius:12px}
+.brow:hover{border-color:var(--faint)}
+.brow-main{display:grid;grid-template-columns:40px minmax(0,1fr);align-items:center;gap:14px;min-width:0;padding:2px 0;border:0;background:none;text-align:left;border-radius:8px;color:inherit}
+.brow .cover{width:40px;max-width:40px;flex:none;box-shadow:0 1px 1px rgba(0,0,0,.2),0 6px 10px -7px rgba(0,0,0,.55)}
+.brow .cover .tag{left:26%;top:9%;font-size:8.5px;letter-spacing:.12em;max-height:78%}
+.brow-body{min-width:0;display:grid;gap:3px}
+.brow .book-title{text-wrap:pretty}
+.brow-meta{color:var(--muted);font-size:12.5px;font-variant-numeric:tabular-nums}
+.brow-prog{display:flex;align-items:center;gap:8px;min-width:0;font-size:12px;color:var(--faint);font-variant-numeric:tabular-nums}
+.brow-prog .bar{flex:1;max-width:180px}
+.brow-prog span{min-width:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.brow .more{width:36px;height:36px;border-radius:8px}
+.brow .more svg{width:18px;height:18px}
+/* 沒有「⋯」的列（說明書、唯讀）右邊補一樣的寬度，書名才會對齊 */
+.brow .more-gap{width:36px;height:36px}
 .empty{grid-column:1/-1;margin:0;padding:22px;border:1.5px dashed var(--line);border-radius:12px;color:var(--muted);text-align:center;line-height:1.8}
 .ver{margin:40px 0 calc(28px + env(safe-area-inset-bottom,0px));text-align:center;font-size:12px;line-height:2;color:var(--faint);font-variant-numeric:tabular-nums}
 .ver button,.ver a{padding:0 2px;color:inherit;font:inherit;text-decoration:underline;text-underline-offset:3px}
@@ -306,11 +327,14 @@ body.ttsbar-on.player-open .toast{bottom:calc(150px + var(--ttsbar-h))}
     <section class="continue" id="continue" hidden></section>
     <div class="shelf-head">
       <h2>書架</h2>
-      <select id="sortSel" aria-label="排序">
-        <option value="recent">最近閱讀</option>
-        <option value="added">加入時間</option>
-        <option value="title">書名</option>
-      </select>
+      <div class="shelf-tools">
+        <select id="sortSel" aria-label="排序">
+          <option value="recent">最近閱讀</option>
+          <option value="added">加入時間</option>
+          <option value="title">書名</option>
+        </select>
+        <button class="view-btn" id="viewBtn" type="button" aria-label="切換成清單顯示"></button>
+      </div>
     </div>
     <div class="tag-bar" id="tagBar" hidden></div>
     <div class="grid" id="grid"></div>
@@ -458,7 +482,7 @@ body.ttsbar-on.player-open .toast{bottom:calc(150px + var(--ttsbar-h))}
 
 /* 網頁版本：每次改這個檔案推上去都要跟著改（年.月.日，同一天第二版起加 .2、.3）。
    書架最下面會顯示，「檢查更新」拿線上那份的這一行來比 */
-const WEB_VERSION = '2026.09.24';
+const WEB_VERSION = '2026.09.24.2';
 
 /* ───────── 小工具 ───────── */
 const $ = (s, r = document) => r.querySelector(s);
@@ -486,7 +510,9 @@ const I = {
   arrow: SVG('<path d="M5 12h14M13 6l6 6-6 6"/>'),
   vol: SVG('<path d="M4 9.5v5h3.5L12 18.5v-13L7.5 9.5z" fill="currentColor" stroke="none"/><path d="M15.5 9a4 4 0 010 6M18 6.5a7.5 7.5 0 010 11"/>'),
   chPrev: SVG('<path d="M12 6l-6 6 6 6M18.5 6l-6 6 6 6"/>'),
-  chNext: SVG('<path d="M12 6l6 6-6 6M5.5 6l6 6-6 6"/>')
+  chNext: SVG('<path d="M12 6l6 6-6 6M5.5 6l6 6-6 6"/>'),
+  grid: SVG('<rect x="4" y="4" width="6.5" height="6.5" rx="1.2"/><rect x="13.5" y="4" width="6.5" height="6.5" rx="1.2"/><rect x="4" y="13.5" width="6.5" height="6.5" rx="1.2"/><rect x="13.5" y="13.5" width="6.5" height="6.5" rx="1.2"/>'),
+  list: SVG('<path d="M9 6h11M9 12h11M9 18h11"/><rect x="3.5" y="4.5" width="3" height="3" rx=".8" fill="currentColor" stroke="none"/><rect x="3.5" y="10.5" width="3" height="3" rx=".8" fill="currentColor" stroke="none"/><rect x="3.5" y="16.5" width="3" height="3" rx=".8" fill="currentColor" stroke="none"/>')
 };
 function fmtChars(n) {
   n = n || 0;
@@ -542,7 +568,7 @@ const FONTS = {
 };
 const WIDTHS = { s: '30em', m: '38em', l: '48em' };
 const storedPrefs = LS.get('prefs', null);
-const prefs = Object.assign({ fs: matchMedia('(max-width: 600px)').matches ? 19 : 21, lh: 1.9, font: 'serif', theme: 'auto', width: 'm', indent: true, rate: 1, voice: '', volume: 1, sleep: '0', sort: 'recent', tag: '', paren: 'gloss' }, storedPrefs || {});
+const prefs = Object.assign({ fs: matchMedia('(max-width: 600px)').matches ? 19 : 21, lh: 1.9, font: 'serif', theme: 'auto', width: 'm', indent: true, rate: 1, voice: '', volume: 1, sleep: '0', sort: 'recent', tag: '', paren: 'gloss', view: 'grid' }, storedPrefs || {});
 const savePrefs = () => LS.set('prefs', prefs);
 
 /* ───────── 內建說明書 ───────── */
@@ -1128,8 +1154,9 @@ function slotsDialog() {
 const guideBook = () => ({ id: GUIDE_ID, title: 'K書吧使用說明', author: 'K書吧', format: 'md', builtin: true, chars: countChars(GUIDE_MD), chapters: 6, addedAt: 0 });
 
 /* ───────── 書架畫面 ───────── */
-function coverHTML(b, withAuthor = true) {
-  return `<div class="cover" style="--c:${coverColor(b)}">${b.builtin ? '<span class="tag">說明</span>' : bookTags(b)[0] ? `<span class="tag">${esc(bookTags(b)[0])}</span>` : ''}<div class="slip">${esc(b.title)}</div>${withAuthor && b.author && !b.builtin ? `<span class="auth">${esc(b.author)}</span>` : ''}</div>`;
+// withSlip=false 是清單模式的縮小版：只留底色、書脊、標籤，不放直書書名（40px 寬放不下）
+function coverHTML(b, withAuthor = true, withSlip = true) {
+  return `<div class="cover" style="--c:${coverColor(b)}">${b.builtin ? '<span class="tag">說明</span>' : bookTags(b)[0] ? `<span class="tag">${esc(bookTags(b)[0])}</span>` : ''}${withSlip ? `<div class="slip">${esc(b.title)}</div>` : ''}${withAuthor && b.author && !b.builtin ? `<span class="auth">${esc(b.author)}</span>` : ''}</div>`;
 }
 function sortedBooks(src = S.books) {
   const list = src.slice();
@@ -1177,10 +1204,32 @@ function renderLibrary() {
     cont.hidden = false;
   } else cont.hidden = true;
 
+  // 格狀／清單：切換鈕的圖示畫「切過去會變成」的樣子；清單模式在容器加 .list，格狀完全沿用原本的卡片
+  const listMode = prefs.view === 'list';
+  const vb = $('#viewBtn');
+  vb.innerHTML = listMode ? I.grid : I.list;
+  vb.setAttribute('aria-label', listMode ? '切換成格狀顯示' : '切換成清單顯示');
+  vb.title = listMode ? '格狀顯示' : '清單顯示';
+  $('#grid').classList.toggle('list', listMode);
+
   const cards = sortedBooks(shown).concat(prefs.tag ? [] : [guideBook()]).map(b => {
     const p = getProgress(b.id);
     const pct = p ? Math.round((p.pct || 0) * 100) : 0;
     const chs = b.chapters || 0;
+    if (listMode) {
+      const where = p && typeof p.ch === 'number' ? slotWhere(p) + ' · ' : '';
+      return `<article class="brow">
+      <button class="brow-main" type="button" data-open="${esc(b.id)}" aria-label="閱讀《${esc(b.title)}》">
+        ${coverHTML(b, false, false)}
+        <div class="brow-body">
+          <h3 class="book-title">${esc(b.title)}</h3>
+          <div class="brow-meta">${fmtChars(b.chars)}${chs ? ` · ${chs} 章` : ''}</div>
+          ${p ? `<div class="brow-prog"><span>${where}${pct >= 100 ? '讀完' : pct + '%'}</span><div class="bar"><i style="width:${pct}%"></i></div></div>` : '<div class="brow-prog"><span>還沒讀</span></div>'}
+        </div>
+      </button>
+      ${!b.builtin && writable ? `<button class="icon more" type="button" data-edit="${esc(b.id)}" aria-label="編輯《${esc(b.title)}》">${I.more}</button>` : '<span class="more-gap"></span>'}
+    </article>`;
+    }
     return `<article class="book">
       <button class="cover-btn" type="button" data-open="${esc(b.id)}" aria-label="閱讀《${esc(b.title)}》">${coverHTML(b)}</button>
       <div>
@@ -2240,6 +2289,7 @@ function wire() {
   $('#btnImport').onclick = () => $('#fileInput').click();
   $('#fileInput').addEventListener('change', e => { const f = e.target.files; if (f && f.length) importFiles(f); e.target.value = ''; });
   $('#sortSel').onchange = e => { prefs.sort = e.target.value; savePrefs(); renderLibrary(); };
+  $('#viewBtn').onclick = () => { prefs.view = prefs.view === 'list' ? 'grid' : 'list'; savePrefs(); renderLibrary(); };
   $('#syncChip').onclick = connectDialog;
   $('#library').addEventListener('click', e => {
     if (e.target.closest('[data-connect]')) { connectDialog(); return; }

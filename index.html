@@ -628,6 +628,7 @@ pronounce:
 - 念到**章名、小節標題**時，前後會各停一下、念得慢一點，聽得出那是標題不是內文；換段也會停一下，換章停最久，對話前後會留個空（App 要 1.5 以上，1.4 只有標題停頓）。語速調快時停頓跟著縮短。
 - **念錯字了**：選取念錯的詞，下方會出現「修正讀音」，輸入同音字（例如「重新」寫成「蟲新」），可以先**試聽**，再選「這本書」或「所有書」。畫面上照樣是原文，只有朗讀會換；正在念的話，存好會從這一段重新念。只選一個字會提醒你：那個字在書裡每次出現都會被換掉，最好選整個詞。
 - **讀音字典**：朗讀設定裡的「讀音字典…」可以一次看、一次改所有條目；書卡「⋯」→ 編輯也有這本書的讀音欄。書檔 frontmatter 的「pronounce:」也算，同一個詞以網頁上改的為準。字典存在書架上，每台裝置都一樣。
+- **場景分隔**：整段只有符號的（例如「＊＊＊」）不念，換成停久一點。
 - **符號和數字**：破折號、刪節號念成停頓；「2.5×」念「2.5 倍」、「3×4」念「3 乘 4」、「3～5」念「3 到 5」；「II」「IV」這類羅馬數字念成中文數字；「網頁／App」的斜線念成停頓。
 - **括號裡的補充**：朗讀設定可以選照念、只跳過英文注解（例如「伺服器（server）」不念括號，預設）、或括號都不念。
 - 朗讀時會盡量讓螢幕保持亮著。切到別的 App 或鎖定螢幕時，K書吧 會設法讓朗讀繼續，通知欄和鎖定畫面也有播放、暫停、上一段／下一段的按鈕；不過有些手機的瀏覽器還是會把朗讀停掉，回到 K書吧 就會接著念。
@@ -1791,8 +1792,10 @@ const CITE_RE = /(?<![\w)\]])(?:\[\d{1,3}(?:\s*[,，、–-]\s*\d{1,3})*\])+/g;
 /* 停頓：每一段開始前停多久（毫秒，1× 語速的基準）。換段停一下，標題（章名、### 小節名）前後停久一點、
    標題本身念慢一點，換章停最久，聽的人才分得出段落和標題。第一段（剛按播放、點段落開始念）不停 */
 const isHead = el => !!el && /^H[1-6]$/.test(el.tagName);
+// 只有符號的段落（「＊＊＊」「◇」這類場景分隔）：不念，後面那段停久一點
+const isBreak = el => !!el && !/[\p{L}\p{N}]/u.test(el.textContent);
 const PARA_GAP = 250, HEAD_GAP = 700, CH_GAP = 1500, HEAD_RATE = 0.85;
-const preGaps = els => els.map((el, k) => k === 0 ? CH_GAP : Math.max(isHead(el) ? HEAD_GAP : PARA_GAP, isHead(els[k - 1]) ? HEAD_GAP : 0));
+const preGaps = els => els.map((el, k) => k === 0 ? CH_GAP : Math.max(isHead(el) ? HEAD_GAP : PARA_GAP, isHead(els[k - 1]) || isBreak(els[k - 1]) ? HEAD_GAP : 0));
 // 語速快時停頓跟著縮短，但縮得比語速慢（4× 時停一半）
 const gapMs = ms => Math.round(ms / Math.sqrt(Math.max(1, prefs.rate)));
 
@@ -1831,7 +1834,7 @@ function speakable(s) {
 }
 // 念出來的文字：去掉網址、出處編號 → 讀音字典 → 符號整理
 const rawText = el => el.textContent.replace(/https?:\/\/\S+/g, ' ').replace(CITE_RE, '').replace(/\s+/g, ' ').trim();
-const speechText = (el, silent) => silent ? '' : speakable(R.pron ? R.pron(rawText(el)) : rawText(el));
+const speechText = (el, silent) => silent || isBreak(el) ? '' : speakable(R.pron ? R.pron(rawText(el)) : rawText(el));
 
 function chapterBlocks(c) {
   if (!c.html) { try { c.html = sanitize(c.render()); } catch { c.html = ''; } }

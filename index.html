@@ -487,7 +487,7 @@ body.ttsbar-on.player-open .toast{bottom:calc(150px + var(--ttsbar-h))}
 
 /* 網頁版本：每次改這個檔案推上去都要跟著改（年.月.日，同一天第二版起加 .2、.3）。
    書架最下面會顯示，「檢查更新」拿線上那份的這一行來比 */
-const WEB_VERSION = '2026.09.24.4';
+const WEB_VERSION = '2026.09.24.5';
 
 /* ───────── 小工具 ───────── */
 const $ = (s, r = document) => r.querySelector(s);
@@ -1382,16 +1382,57 @@ async function addOne(text, format, fallbackTitle, forcedTitle, forcedAuthor) {
   } catch (e) { toast(errMsg(e), 5000); }
 }
 
+/* ───────── 返回鍵 ───────── */
+// 手機的返回鍵／左滑（App 的返回鍵也是照網頁的 history 走）：先關最上面那一層
+// （對話框、目錄、字級、播放面板），都關了才退出閱讀，最後才回到桌面。
+// 每打開一層推一格 history；用按鈕、Esc、點外面關掉時再退回去，不留空格子。
+// history.go() 要等一下才生效，緊接著的 pushState（例如從進度格直接翻開書）要排在它後面，不然會被退掉。
+const H = { stack: [], seq: Date.now(), q: Promise.resolve(), skip: null };
+function histOp(fn) { H.q = H.q.then(fn, fn); }
+function layerPush(name, close) {
+  if (H.stack.some(x => x.name === name && x.open)) return;
+  const rec = { name, close, open: true, id: ++H.seq };
+  H.stack.push(rec);
+  histOp(() => { try { history.pushState({ shuxia: name, id: rec.id }, ''); } catch {} });
+}
+// 自己關掉一層：它在最上面就退回去（連同底下已經關掉的格子）；上面還有開著的就先標成關掉，之後按返回時跳過
+function layerDone(name) {
+  const i = H.stack.findIndex(x => x.name === name && x.open);
+  if (i < 0) return;
+  H.stack[i].open = false;
+  if (H.stack.slice(i + 1).some(x => x.open)) return;
+  const topId = H.stack[H.stack.length - 1].id;
+  let j = i; while (j > 0 && !H.stack[j - 1].open) j--;
+  const n = H.stack.length - j;
+  H.stack.length = j;
+  histOp(() => {
+    if (!history.state || history.state.id !== topId) return; // pushState 沒成功，別退到別的網站去
+    return new Promise(res => {
+      const done = () => { if (H.skip === done) H.skip = null; res(); };
+      H.skip = done; history.go(-n); setTimeout(done, 600);
+    });
+  });
+}
+function onPopState() {
+  if (H.skip) { H.skip(); return; } // layerDone 自己退的
+  const id = history.state && history.state.id;
+  const k = H.stack.findIndex(x => x.id === id); // -1：退到最底（書架）
+  H.stack.splice(k + 1).reverse().forEach(x => { if (x.open) x.close(); });
+  if (k >= 0 && !H.stack[k].open) history.back(); // 落在已經關掉的那格：再往下退
+}
+
 /* ───────── 對話框 ───────── */
 let modalResolve = null;
 function openModal(html) {
   const m = $('#modal'), p = $('#modalPanel');
+  if (m.hidden) layerPush('modal', closeModal);
   p.innerHTML = html; m.hidden = false;
   const f = p.querySelector('[autofocus]') || p.querySelector('.btn.primary') || p.querySelector('input,textarea,button');
   setTimeout(() => f && f.focus(), 30);
   return p;
 }
 function closeModal() {
+  layerDone('modal');
   $('#modal').hidden = true; $('#modalPanel').innerHTML = '';
   const r = modalResolve; modalResolve = null; if (r) r(null);
 }
@@ -1586,7 +1627,7 @@ async function openBook(id, startAt) {
   R.book = book; R.chapters = []; R.blocks = [];
   R.view = 'reader';
   $('#library').hidden = true; $('#reader').hidden = false;
-  try { history.pushState({ shuxia: 'reader' }, ''); } catch {}
+  layerPush('reader', closeReader);
   applyPrefs();
   $('#rBook').textContent = book.title; $('#rChap').textContent = '';
   $('#article').innerHTML = '<p class="loading">正在翻開…</p>';
@@ -1661,6 +1702,7 @@ function closeReader() {
   ttsStop();
   savePos(); flushCloud();
   closePanels();
+  layerDone('reader');
   $('#pronChip').hidden = true;
   R.view = 'library'; R.book = null; updateMediaSession();
   $('#reader').hidden = true; $('#library').hidden = false;
@@ -1836,11 +1878,12 @@ const setFs = v => setPref('fs', Math.max(14, Math.min(34, Math.round(v))));
 function panelOpen() { return !$('#toc').hidden || !$('#aaSheet').hidden; }
 function openPanel(id) {
   closePanels();
+  layerPush(id, closePanels);
   $(id).hidden = false; $('#scrim').hidden = false;
   $('#reader').classList.remove('bars-hidden');
   if (id === '#toc') { const cur = $('#tocList .cur'); if (cur) cur.scrollIntoView({ block: 'center' }); }
 }
-function closePanels() { $('#toc').hidden = true; $('#aaSheet').hidden = true; $('#scrim').hidden = true; }
+function closePanels() { layerDone('#toc'); layerDone('#aaSheet'); $('#toc').hidden = true; $('#aaSheet').hidden = true; $('#scrim').hidden = true; }
 
 /* ───────── 朗讀（Web Speech API） ───────── */
 const synth = ('speechSynthesis' in window) ? window.speechSynthesis : null;
@@ -2090,6 +2133,7 @@ function currentVoice() {
     || vs.find(v => /^zh/i.test(v.lang)) || null;
 }
 function showPlayer() {
+  layerPush('player', hidePlayer);
   $('#player').hidden = false; $('#reader').classList.add('with-player'); document.body.classList.add('player-open');
 }
 function showPlayerSettings() {
@@ -2221,6 +2265,7 @@ function ttsStop() {
 }
 // 只收起播放面板，朗讀照常；按進度列左邊的設定鈕再叫出來
 function hidePlayer() {
+  layerDone('player');
   $('#player').hidden = true; $('#reader').classList.remove('with-player'); document.body.classList.remove('player-open');
 }
 // App 的朗讀服務手上是不是這本書（網頁重載過、或服務被系統收掉再起來時可能不是）；不是就整本重送，免得跳到別本書的段落
@@ -2339,8 +2384,8 @@ function wire() {
   });
 
   // 閱讀
-  $('#btnBack').onclick = () => { if (history.state && history.state.shuxia === 'reader') history.back(); else closeReader(); };
-  window.addEventListener('popstate', () => { if (R.view === 'reader') closeReader(); });
+  $('#btnBack').onclick = closeReader;
+  window.addEventListener('popstate', onPopState);
   $('#btnToc').onclick = () => openPanel('#toc');
   $('#btnAa').onclick = () => { if ($('#aaSheet').hidden) openPanel('#aaSheet'); else closePanels(); };
   $('#btnTts').onclick = () => { if ($('#player').hidden) ttsQuickToggle(); else ttsToggle(); };

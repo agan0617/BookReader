@@ -71,7 +71,7 @@
 - **本機副本**：每台裝置的瀏覽器用 IndexedDB 存一份完整書架（書目、書檔、進度）。打開時先顯示本機的，再跟書架 repo 比對：補下載新書與改版、清掉已下架的，沒網路也能讀
 - **離線閱讀**：`sw.js`（Service Worker）把頁面本身、marked／DOMPurify、字型存在裝置上，沒網路也打得開（有網路時一律先抓最新頁面，8 秒內抓不到才用存的）。`manifest.webmanifest` 讓手機瀏覽器可以「加到主畫面」當 PWA 用；App 的 WebView 跑的是同一支 Service Worker，所以 App 離線也能開。網路回來時自動重新連上書架、補傳進度
 - **版本**：書架最下面顯示網頁版本（`index.html` 開頭的 `WEB_VERSION`，格式「年.月.日」、同一天第二版起加 `.2`；**每次改 `index.html` 推上去都要改**），在 App 裡再加上 App 版本（`KBookNative.version()`）。「檢查更新」抓線上的 `index.html?ver=…`（`sw.js` 不經手，不會拿快取回答）比 `WEB_VERSION`；App 版本跟 [KBookBarApp 的 Releases](https://github.com/agan0617/KBookBarApp/releases) 最新 tag 比，App 裡每 12 小時自動查一次，有書架 token 就帶上避開未登入每小時 60 次的限制
-- 閱讀進度同步：換章、回書架、離開頁面時各 commit 一次到 `progress.json`；同一章讀很久時最多每 3 分鐘補存一次；離線時讀的進度下次連上時補傳。進度記成 **slot**：每台裝置每本書每一章一格、全書架最多 30 格（同一章只更新位置，舊的自動掉出去），裝置之間不會互相蓋掉；「繼續閱讀」底下可以列出所有裝置的格子挑一格接著讀
+- 閱讀進度同步：換章、回書架、離開頁面時各 commit 一次到 `progress.json`；同一章讀很久時最多每 3 分鐘補存一次；離線時讀的進度下次連上時補傳。進度記成 **slot**：每台裝置每本書每一章一格、全書架最多 99 格（同一章只更新位置，舊的自動掉出去），裝置之間不會互相蓋掉；「繼續閱讀」底下可以列出所有裝置的格子挑一格接著讀
 - 朗讀設定（語音、速度、音量、定時停止）每台裝置各自記在 localStorage
 - Android 上想在背景、關螢幕也繼續朗讀，用 [K書吧 Android App](https://github.com/agan0617/KBookBarApp)（同一個網頁包成 App，朗讀改用手機語音引擎）
 
@@ -83,6 +83,6 @@
 |---|---|
 | `library.json` | `{"books":[…]}`，每本：`id`、`title`、`author`、`format`（`md`／`txt`）、`chars`、`chapters`、`file`、`addedAt`、`updatedAt`（毫秒時間戳）、`tags`（字串陣列，可省略；每本最多 8 個、每個最多 20 字） |
 | `books/<書名>.md`、`.txt` | 書檔原文（UTF-8）；檔名＝書名，撞名加 ` (2)`，實際路徑以書目的 `file` 為準 |
-| `progress.json` | `{"_slots":[{"id","dev","name","ch","b","pct","t","at"},…],"<書 id>":{"ch","b","pct","t","at"}}`：`_slots` 是進度格清單（新的在前，最多 30 格；`id` 書 id、`dev` 裝置 id、`name` 裝置名），`ch` 章（從 0 起）、`b` 章內第幾段、`pct` 0～1、`t` 章名、`at` 毫秒時間戳；每本書外層那筆是它最新的一格，格子全掉出清單的書也還留著。舊格式（每本書 `devs` 裡各裝置一份）第一次存進度時會自動換算成格子 |
+| `progress.json` | `{"_slots":[{"id","dev","name","ch","b","pct","t","at"},…],"<書 id>":{"ch","b","pct","t","at"}}`：`_slots` 是進度格清單（新的在前，最多 99 格；`id` 書 id、`dev` 裝置 id、`name` 裝置名），`ch` 章（從 0 起）、`b` 章內第幾段、`pct` 0～1、`t` 章名、`at` 毫秒時間戳；每本書外層那筆是它最新的一格，格子全掉出清單的書也還留著。舊格式（每本書 `devs` 裡各裝置一份）第一次存進度時會自動換算成格子 |
 
 `chars`、`chapters` 要跟頁面的算法一致，不然頁面會顯示錯的字數與章數。

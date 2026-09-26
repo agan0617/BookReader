@@ -489,7 +489,7 @@ body.ttsbar-on.player-open .toast{bottom:calc(150px + var(--ttsbar-h))}
 
 /* 網頁版本：每次改這個檔案推上去都要跟著改（年.月.日，同一天第二版起加 .2、.3）。
    書架最下面會顯示，「檢查更新」拿線上那份的這一行來比 */
-const WEB_VERSION = '2026.09.25.2';
+const WEB_VERSION = '2026.09.26.1';
 
 /* ───────── 小工具 ───────── */
 const $ = (s, r = document) => r.querySelector(s);
@@ -1123,9 +1123,27 @@ function allSlots() {
 const ownCloud = id => allSlots().find(x => x.dev === DEV.id && x.id === id) || null;
 // 這台裝置在這本書讀到哪：雲端那格和本機記的，取新的
 function ownProgress(id) {
-  const a = ownCloud(id), b = LS.get('prog:' + id, null);
-  if (!a) return b; if (!b) return a;
-  return (a.at || 0) >= (b.at || 0) ? a : b;
+  // 雲端那格、本機記的、App 朗讀服務自己記的（App 1.7+），取最新的
+  const cands = [ownCloud(id), LS.get('prog:' + id, null), nativeLast(id)].filter(Boolean);
+  return cands.length ? cands.reduce((x, y) => ((y.at || 0) > (x.at || 0) ? y : x)) : null;
+}
+/* App 1.7+ 的朗讀服務每念一段就自己記一次位置：畫面被小米收掉、網頁收不到事件、或背景計時器被節流時，
+   網頁那邊的進度會停在開始聽的地方，靠這份補回來 */
+function nativeLast(id) {
+  if (!window.KBookNative || typeof window.KBookNative.lastPos !== 'function') return null;
+  try {
+    const x = JSON.parse(window.KBookNative.lastPos() || 'null');
+    return x && x.bookId === id && typeof x.ch === 'number' ? { ch: x.ch, b: x.b | 0, at: x.at || 0 } : null;
+  } catch { return null; }
+}
+// 啟動／回到前景時：App 記的比本機新就寫回本機，書架的「繼續閱讀」和雲端同步才會跟上
+function adoptNativeLast() {
+  if (!window.KBookNative || typeof window.KBookNative.lastPos !== 'function') return;
+  let x; try { x = JSON.parse(window.KBookNative.lastPos() || 'null'); } catch { return; }
+  if (!x || !x.bookId || typeof x.ch !== 'number') return;
+  const l = LS.get('prog:' + x.bookId, null);
+  if (l && (l.at || 0) >= (x.at || 0)) return;
+  LS.set('prog:' + x.bookId, Object.assign({}, l || {}, { ch: x.ch, b: x.b | 0, at: x.at, t: x.t || (l && l.ch === x.ch ? l.t : '') }));
 }
 // 打開書的預設位置：這台自己的優先，這台沒讀過才用其他裝置最新的一格，再沒有就用外層那筆（格子掉出清單的舊書）
 function getProgress(id) {
@@ -2059,7 +2077,8 @@ window.KBookNativeEvent = e => {
     if (e.ch !== R.ch) openChapter(e.ch, { block: e.b });
     T.b = e.b;
     if (T.playing) markSpeaking(e.b);
-    schedulePos();
+    // 直接存，不用 schedulePos 的 0.7 秒延遲：App 在背景時計時器被節流，每段都重設計時會一直存不到
+    savePos();
   }
   if (e.type === 'end') { clearSpeaking(); toast('全書念完了'); }
   if (e.type === 'sleep') { T.sleepAt = 0; T.stopAtChEnd = false; $('#sleepSel').value = '0'; toast('時間到，已停止朗讀'); }
@@ -2496,7 +2515,7 @@ function wire() {
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'hidden') { savePos(); flushCloud(true); }
     else {
-      if (NATIVE) { if (R.view === 'reader') window.KBookNativeEvent(Object.assign(nativeState(), { type: 'pos' })); }
+      if (NATIVE) { adoptNativeLast(); if (R.view === 'reader') window.KBookNativeEvent(Object.assign(nativeState(), { type: 'pos' })); else renderLibrary(); }
       else if (T.playing) { acquireWake(); if (synth && !synth.speaking) restartSpeech(); }
       // 切回來時抓一次別台裝置的最新書架與進度
       if (Date.now() - lastRefresh > 30000 && !cloudBusy) {
@@ -2513,7 +2532,7 @@ function wire() {
 /* ───────── 啟動 ───────── */
 let lastRefresh = Date.now();
 async function init() {
-  wire(); applyPrefs(); renderLibrary(); renderVer();
+  adoptNativeLast(); wire(); applyPrefs(); renderLibrary(); renderVer();
   if (NATIVE && Date.now() - ((LS.get('appRel', null) || {}).at || 0) > 12 * 3600e3) checkUpdates(false);
   // 離線也打得開：Service Worker（sw.js）把頁面、marked／DOMPurify、字型存在裝置上；書檔本來就在 IndexedDB。
   // 有網路時 sw 仍一律抓最新頁面，抓不到才用存的那份
